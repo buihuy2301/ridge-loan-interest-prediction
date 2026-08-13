@@ -31,7 +31,6 @@ style/mau/
 *.synctex.gz
 *.toc
 *.xdv
-report/*.pdf
 
 # macOS
 .DS_Store
