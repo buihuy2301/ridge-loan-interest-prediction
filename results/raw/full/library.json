@@ -1,0 +1,307 @@
+{
+ "meta": {
+  "group": "library",
+  "title": "scikit-learn baselines",
+  "conversion": {
+   "alpha_ridge": 37947.33192202055,
+   "alpha_sgd": 0.03162277660168379,
+   "gap": 4.1521364755021424e-30,
+   "w_distance": 6.805279175815401e-15,
+   "relative_w_distance": 2.3476456227066553e-15,
+   "verified": true
+  },
+  "table": [
+   {
+    "method": "closed form (ours)",
+    "seconds": null,
+    "gap": 0.0,
+    "grad_norm": 5.719969411600694e-12,
+    "rmse_test": null,
+    "n_iter": 1
+   },
+   {
+    "method": "Ridge (solver='auto')",
+    "seconds": 0.2706291249487549,
+    "gap": 4.1521364755021424e-30,
+    "grad_norm": 5.720083443662053e-12,
+    "rmse_test": 3.4646424300697802,
+    "n_iter": null
+   },
+   {
+    "method": "Ridge (solver='cholesky')",
+    "seconds": 0.2849684579996392,
+    "gap": 4.1521364755021424e-30,
+    "grad_norm": 5.720083443662053e-12,
+    "rmse_test": 3.4646424300697802,
+    "n_iter": null
+   },
+   {
+    "method": "Ridge (solver='lsqr')",
+    "seconds": 1.6982813749928027,
+    "gap": 1.132189275582146e-05,
+    "grad_norm": 0.0021837877919404555,
+    "rmse_test": 3.4646597502911956,
+    "n_iter": 19
+   },
+   {
+    "method": "Ridge (solver='sparse_cg')",
+    "seconds": 2.155463457922451,
+    "gap": 1.9943801142044707e-07,
+    "grad_norm": 0.00040701650568338835,
+    "rmse_test": 3.464641836792656,
+    "n_iter": null
+   },
+   {
+    "method": "Ridge (solver='sag')",
+    "seconds": 43.35318466706667,
+    "gap": 3.9576899010378064e-07,
+    "grad_norm": 0.00018317738170883769,
+    "rmse_test": 3.464652546636667,
+    "n_iter": 42
+   },
+   {
+    "method": "SGDRegressor (defaults)",
+    "seconds": 3.032898292061873,
+    "gap": 6.211851413953787e+20,
+    "grad_norm": 35114653201.7439,
+    "rmse_test": 33039041537.793953,
+    "n_iter": 6
+   },
+   {
+    "method": "LinearRegression",
+    "seconds": 2.7855585829820484,
+    "gap": 0.01745039775256993,
+    "grad_norm": 0.10096345901465449,
+    "rmse_test": 3.4614223700658524,
+    "n_iter": null
+   }
+  ],
+  "n": 1200000,
+  "d": 116,
+  "lam": 0.03162277660168379,
+  "L": 9.062027652621289,
+  "mu": 0.034035888676865945,
+  "kappa": 266.24918593004776,
+  "f_star": 6.142805757301266,
+  "w_star_norm": 2.8987676461873475
+ },
+ "records": [
+  {
+   "label": "Ridge (solver='auto')",
+   "status": "converged",
+   "direction_label": "library",
+   "step_label": "Ridge (solver='auto')",
+   "iters": [
+    1
+   ],
+   "gaps": [
+    4.1521364755021424e-30
+   ],
+   "gnorms": [
+    5.720083443662053e-12
+   ],
+   "times": [
+    0.2706291249487549
+   ],
+   "rows_seen": [
+    0
+   ],
+   "fevals": [
+    0
+   ],
+   "w_final": [],
+   "is_stochastic": false,
+   "rows_per_epoch": 0,
+   "meta": {
+    "library": true,
+    "rmse_test": 3.4646424300697802
+   }
+  },
+  {
+   "label": "Ridge (solver='cholesky')",
+   "status": "converged",
+   "direction_label": "library",
+   "step_label": "Ridge (solver='cholesky')",
+   "iters": [
+    1
+   ],
+   "gaps": [
+    4.1521364755021424e-30
+   ],
+   "gnorms": [
+    5.720083443662053e-12
+   ],
+   "times": [
+    0.2849684579996392
+   ],
+   "rows_seen": [
+    0
+   ],
+   "fevals": [
+    0
+   ],
+   "w_final": [],
+   "is_stochastic": false,
+   "rows_per_epoch": 0,
+   "meta": {
+    "library": true,
+    "rmse_test": 3.4646424300697802
+   }
+  },
+  {
+   "label": "Ridge (solver='lsqr')",
+   "status": "converged",
+   "direction_label": "library",
+   "step_label": "Ridge (solver='lsqr')",
+   "iters": [
+    19
+   ],
+   "gaps": [
+    1.132189275582146e-05
+   ],
+   "gnorms": [
+    0.0021837877919404555
+   ],
+   "times": [
+    1.6982813749928027
+   ],
+   "rows_seen": [
+    0
+   ],
+   "fevals": [
+    0
+   ],
+   "w_final": [],
+   "is_stochastic": false,
+   "rows_per_epoch": 0,
+   "meta": {
+    "library": true,
+    "rmse_test": 3.4646597502911956
+   }
+  },
+  {
+   "label": "Ridge (solver='sparse_cg')",
+   "status": "converged",
+   "direction_label": "library",
+   "step_label": "Ridge (solver='sparse_cg')",
+   "iters": [
+    1
+   ],
+   "gaps": [
+    1.9943801142044707e-07
+   ],
+   "gnorms": [
+    0.00040701650568338835
+   ],
+   "times": [
+    2.155463457922451
+   ],
+   "rows_seen": [
+    0
+   ],
+   "fevals": [
+    0
+   ],
+   "w_final": [],
+   "is_stochastic": false,
+   "rows_per_epoch": 0,
+   "meta": {
+    "library": true,
+    "rmse_test": 3.464641836792656
+   }
+  },
+  {
+   "label": "Ridge (solver='sag')",
+   "status": "converged",
+   "direction_label": "library",
+   "step_label": "Ridge (solver='sag')",
+   "iters": [
+    42
+   ],
+   "gaps": [
+    3.9576899010378064e-07
+   ],
+   "gnorms": [
+    0.00018317738170883769
+   ],
+   "times": [
+    43.35318466706667
+   ],
+   "rows_seen": [
+    0
+   ],
+   "fevals": [
+    0
+   ],
+   "w_final": [],
+   "is_stochastic": false,
+   "rows_per_epoch": 0,
+   "meta": {
+    "library": true,
+    "rmse_test": 3.464652546636667
+   }
+  },
+  {
+   "label": "SGDRegressor (defaults)",
+   "status": "converged",
+   "direction_label": "library",
+   "step_label": "SGDRegressor (defaults)",
+   "iters": [
+    6
+   ],
+   "gaps": [
+    6.211851413953787e+20
+   ],
+   "gnorms": [
+    35114653201.7439
+   ],
+   "times": [
+    3.032898292061873
+   ],
+   "rows_seen": [
+    0
+   ],
+   "fevals": [
+    0
+   ],
+   "w_final": [],
+   "is_stochastic": false,
+   "rows_per_epoch": 0,
+   "meta": {
+    "library": true,
+    "rmse_test": 33039041537.793953
+   }
+  },
+  {
+   "label": "LinearRegression",
+   "status": "converged",
+   "direction_label": "library",
+   "step_label": "LinearRegression",
+   "iters": [
+    1
+   ],
+   "gaps": [
+    0.01745039775256993
+   ],
+   "gnorms": [
+    0.10096345901465449
+   ],
+   "times": [
+    2.7855585829820484
+   ],
+   "rows_seen": [
+    0
+   ],
+   "fevals": [
+    0
+   ],
+   "w_final": [],
+   "is_stochastic": false,
+   "rows_per_epoch": 0,
+   "meta": {
+    "library": true,
+    "rmse_test": 3.4614223700658524
+   }
+  }
+ ]
+}

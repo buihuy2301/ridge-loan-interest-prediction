@@ -1,0 +1,486 @@
+% Compile with: latexmk -xelatex slides.tex
+%
+% The theme is built here rather than taken from a gallery, for two reasons. The
+% Discrete Mathematics template puts frame titles in a full-width coloured bar,
+% and this deck deliberately does not look like it. And metropolis, the obvious
+% off-the-shelf alternative, is not in this TeX Live installation, so using it
+% would force every member of the group to install a package before they could
+% compile. Everything below ships with TeX Live.
+%
+% 19 frames for the 20-minute slot, following section 10.2 of
+% KE_HOACH_TRIEN_KHAI.md.
+\documentclass[11pt, aspectratio=169]{beamer}
+
+\input{preamble.tex}
+
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\floatname{algorithm}{Thuật toán}
+
+% ---------------------------------------------------------------------------
+% A flat theme: no shadows, no navigation, no sidebar. Structure is carried by
+% one thin rule under the frame title and by the sans face, not by filled blocks.
+% ---------------------------------------------------------------------------
+\usetheme{default}
+\usecolortheme{default}
+\setbeamertemplate{navigation symbols}{}
+\setbeamerfont{frametitle}{family=\sffamily, size=\large, series=\bfseries}
+\setbeamerfont{framesubtitle}{family=\sffamily, size=\small}
+\setbeamerfont{title}{family=\sffamily, size=\LARGE, series=\bfseries}
+\setbeamerfont{author}{family=\sffamily, size=\small}
+\setbeamerfont{date}{family=\sffamily, size=\small}
+\setbeamercolor{structure}{fg=accent}
+\setbeamercolor{frametitle}{fg=ink, bg=}
+\setbeamercolor{normal text}{fg=ink}
+
+% `@` is not a letter in a .tex file, so the emptiness test for the optional
+% subtitle has to be wrapped in \makeatletter.
+\makeatletter
+\setbeamertemplate{frametitle}{%
+  \vspace{0.6em}%
+  \usebeamerfont{frametitle}\insertframetitle\par
+  \ifx\insertframesubtitle\@empty\else
+    {\usebeamerfont{framesubtitle}\color{rule}\insertframesubtitle\par}%
+  \fi
+  \vspace{0.2em}{\color{accent}\rule{\textwidth}{1pt}}\par
+}
+\makeatother
+
+\setbeamertemplate{footline}{%
+  \hbox{\begin{beamercolorbox}[wd=\paperwidth, ht=2.4ex, dp=1.4ex, leftskip=1.6em, rightskip=1.6em]{}%
+    {\sffamily\scriptsize\color{rule}\insertshorttitle}\hfill
+    {\sffamily\scriptsize\color{rule}\insertframenumber/\inserttotalframenumber}%
+  \end{beamercolorbox}}%
+}
+
+\setbeamertemplate{itemize item}{\color{accent}\textbullet}
+\setbeamertemplate{itemize subitem}{\color{rule}--}
+\setbeamertemplate{caption}{\raggedright\sffamily\scriptsize\insertcaption\par}
+\setbeamertemplate{blocks}[default]
+\setbeamercolor{block title}{fg=accent, bg=}
+
+% One-line takeaway pinned under a figure. Two lines at most, per section 5 of
+% docs/quy-uoc-bao-cao.md; the rest is for the presenter to say.
+\newcommand{\chotlai}[1]{\vspace{0.3em}{\small #1}}
+
+% Beamer takes the short form in the optional argument; there is no \shorttitle.
+\title[Tối ưu hóa hàm mất mát Ridge]{Tối ưu hóa hàm mất mát Ridge}
+\subtitle{Dự đoán lãi suất khoản vay trên bộ dữ liệu Lending Club}
+\author{Nhóm \dots{} \textbullet{} Lớp Khoa học dữ liệu}
+\date{\today}
+
+\begin{document}
+
+% ======================= PHẦN 1. ĐẶT VẤN ĐỀ =======================
+
+\begin{frame}[plain]
+  \vspace{1.2em}
+  {\usebeamerfont{title}\color{ink}\inserttitle\par}
+  \vspace{0.4em}{\color{accent}\rule{0.5\textwidth}{1.2pt}\par}
+  \vspace{0.6em}
+  {\sffamily\large\color{rule}\insertsubtitle\par}
+  \vfill
+  {\usebeamerfont{author}\insertauthor\par}
+  {\usebeamerfont{date}\color{rule}\insertdate\par}
+\end{frame}
+
+\begin{frame}{Dữ liệu và bài toán}{Lending Club, 2007--2018}
+  \begin{columns}[T]
+    \begin{column}{0.52\textwidth}
+      \begin{itemize}
+        \item \num{2260668} khoản vay, 151 cột.
+        \item Dự đoán lãi suất \texttt{int\_rate}.
+        \item Sau làm sạch: $d = 116$ thuộc tính.
+        \item Hai quy mô: \num{200000} và \num{1200000}.
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.44\textwidth}
+      \begin{itemize}
+        \item Loại \texttt{sub\_grade}: một mình nó giải thích $R^2 = 0{,}96$ của lãi suất.
+        \item Lending Club tra lãi suất từ bậc tín dụng.
+        \item Sau khi loại: $R^2 \approx 0{,}49$.
+      \end{itemize}
+    \end{column}
+  \end{columns}
+  \note{Nhấn: rò rỉ không làm sai phép tính tối ưu hóa nào, nhưng làm hỏng phần
+    đối chiếu RMSE. Con số 0,96 với 0,49 là thước đo phần rò rỉ.}
+\end{frame}
+
+\begin{frame}{Hàm mục tiêu}{Cố định trước khi bắt đầu mọi thí nghiệm}
+  \[
+    \min_{w \in \R^{d}} \quad f(w) = \frac{1}{2n}\norm{Xw - y}^{2} + \frac{\lambda}{2}\norm{w}^{2}
+  \]
+  \[
+    \nabla f(w) = \tfrac{1}{n} X\trans (Xw - y) + \lambda w,
+    \qquad
+    \nabla^{2} f(w) = \tfrac{1}{n} X\trans X + \lambda I
+  \]
+
+  \begin{itemize}
+    \item Lồi mạnh, khả vi vô hạn lần, \textbf{có nghiệm đóng}.
+    \item Hessian không phụ thuộc $w$, vì $f$ bậc hai.
+    \item $\fstar$ tính được tới sai số máy: $\norm{\nabla f(\wstar)} = 7{,}4\cdot10^{-13}$.
+  \end{itemize}
+  \note{Vì có f*, mọi hình vẽ f(w_k) - f* chứ không vẽ f. Đây là điều kiện để đo
+    sai số tuyệt đối thay vì chỉ so đường cong với nhau.}
+\end{frame}
+
+% ======================= PHẦN 2. ĐẶC TRƯNG BÀI TOÁN =======================
+
+\begin{frame}{Ba hằng số quyết định mọi thứ phía sau}
+  \[
+    L = \lambda_{\max} + \lambda, \qquad \mu = \lambda_{\min} + \lambda, \qquad \kappa = L/\mu
+  \]
+  \begin{center}\small
+    \begin{tabular}{lrrrr}
+      \toprule
+      Quy mô & $n$ & $L$ & $\mu$ & $\kappa$ \\
+      \midrule
+      Quét tham số & \num{200000}  & 9{,}1156 & 0{,}034073 & 267{,}5 \\
+      Toàn phần    & \num{1200000} & 9{,}0620 & 0{,}034036 & 266{,}2 \\
+      \bottomrule
+    \end{tabular}
+  \end{center}
+  \chotlai{Ba hằng số lệch dưới $0{,}6\%$ giữa hai quy mô, nhờ hệ số $\frac{1}{n}$
+    trong hàm mục tiêu. Quét lưới trên mẫu nhỏ vì thế hợp lệ.}
+  \note{Nếu bỏ 1/n thì L tăng tuyến tính theo n và phải quét lại toàn bộ lưới ở
+    mỗi quy mô.}
+\end{frame}
+
+\begin{frame}{Chuẩn hóa cột: một can thiệp lên độ khó bài toán}
+  \begin{columns}[T]
+    \begin{column}{0.54\textwidth}
+      \centering
+      \resultgraphic[0.68]{scaling-kappa_iters}
+    \end{column}
+    \begin{column}{0.42\textwidth}\small
+      \begin{tabular}{lr}
+        \toprule
+        Cách mã hóa & $\kappa$ \\
+        \midrule
+        Thô                & $3{,}87\cdot10^{12}$ \\
+        Chỉ trừ trung bình & $1{,}91\cdot10^{12}$ \\
+        Chuẩn hóa đầy đủ   & $267{,}5$ \\
+        \bottomrule
+      \end{tabular}
+    \end{column}
+  \end{columns}
+  \chotlai{Trừ trung bình hạ $\kappa$ hai lần; chia độ lệch chuẩn hạ tiếp bảy tỉ lần.}
+  \note{Công nằm ở phép chia chứ không ở phép trừ. Các cột lệch nhau sáu bậc:
+    tot_cur_bal cỡ 1e6 bên cạnh dti cỡ hàng chục.}
+\end{frame}
+
+% ======================= PHẦN 3. CHỌN ĐỘ DÀI BƯỚC =======================
+
+\begin{frame}{Bước cố định: ngưỡng \texorpdfstring{$2/L$}{2/L} là ngưỡng thật}
+  \centering
+  \resultgraphic[0.66]{step-fixed_iters}
+
+  \chotlai{$t = 2{,}1/L$ phân kỳ ở vòng 94 vì $\abs{1-tL} = 1{,}1 > 1$;
+    $t = 2/L$ dao động không tắt.}
+  \note{Đường phân kỳ được giữ trong hình chứ không loại bỏ.}
+\end{frame}
+
+\begin{frame}{Bước tối ưu lý thuyết thua bước \texorpdfstring{$1{,}9/L$}{1,9/L}}
+  \begin{columns}[T]
+    \begin{column}{0.46\textwidth}\small
+      \begin{tabular}{lr}
+        \toprule
+        Bước & Vòng lặp \\
+        \midrule
+        $t = 1{,}9/L$    & \textbf{331} \\
+        $t = 1/L$        & 630 \\
+        $t = 2/(L+\mu)$  & 766 \\
+        \bottomrule
+      \end{tabular}
+      \vspace{0.8em}
+
+      \small
+      $\abs{1-tL}$: \\
+      $1{,}9/L \to 0{,}9000$ \\
+      $2/(L+\mu) \to 0{,}9926$
+    \end{column}
+    \begin{column}{0.5\textwidth}\small
+      Sai số ban đầu tại $w_0 = 0$:
+      \begin{itemize}
+        \item hướng $\lambda > 1$ mang $\mathbf{80{,}5\%}$
+        \item hướng $\lambda < 0{,}1$ mang $0{,}3\%$
+      \end{itemize}
+      \[
+        f(w_k) - \fstar = \tfrac{1}{2}\sum_i \lambda_i c_i^2 (1-t\lambda_i)^{2k}
+      \]
+    \end{column}
+  \end{columns}
+  \chotlai{Cận lý thuyết là cận cho \emph{trường hợp xấu nhất}; $w_0 = 0$ không
+    phải trường hợp đó.}
+  \note{Mô hình modal dự đoán 9,80e-7 ở vòng 331 và 9,95e-7 ở vòng 766, khớp
+    đúng số quan sát. Kết luận đảo chiều khi cần độ chính xác rất cao.}
+\end{frame}
+
+\begin{frame}{Backtracking thắng cả hai trục}
+  \begin{center}\small
+    \begin{tabular}{lrrr}
+      \toprule
+      Cấu hình & Vòng lặp & Giây & Lần tính $f$/vòng \\
+      \midrule
+      Armijo $c=0{,}3$, $\rho=0{,}5$ & \textbf{143} & \textbf{3{,}14} & 4{,}94 \\
+      Bước cố định $1{,}9/L$         & 331          & 4{,}75          & 1 \\
+      \bottomrule
+    \end{tabular}
+  \end{center}
+  \[
+    t \le \frac{2(1-c)\norm{g}^{2}}{g\trans \nabla^{2}f\, g}
+  \]
+  \chotlai{Armijo so với thương Rayleigh \emph{tại chỗ}, không với $L$ toàn cục,
+    nên nhận bước lớn hơn $2/L$ ở hướng phẳng.}
+  \note{Ngược dự đoán thông thường là "thắng vòng lặp, thua thời gian".
+    Đảo chiều khi mỗi lần tính f đắt ngang một gradient và kappa nhỏ.}
+\end{frame}
+
+\begin{frame}{Kết luận về chọn bước}{Áp cho cả bốn thuật toán}
+  \begin{itemize}
+    \item $\rho$ quan trọng hơn $c$ rất nhiều: sáu cấu hình $\rho = 0{,}5$ đứng
+      trên toàn bộ mười hai cấu hình $\rho = 0{,}8$ và $0{,}9$; $c$ đổi 3000 lần
+      chỉ làm 167 xuống 143 vòng.
+    \item Dò bước bằng tay: trong lưới $10^{-3}$ tới $10$, chỉ $t = 0{,}1$ hội
+      tụ. Vùng hội tụ là $(0;\,0{,}219)$.
+    \item Tính $L$ và $\mu$ tốn dưới một giây; quét năm bước tốn 195 giây và vẫn
+      không trúng bước gần tối ưu.
+  \end{itemize}
+  \note{Đây là lý do phải tính L thay vì dò. Rho quyết định số lần thử mỗi vòng,
+    mà mỗi lần thử tốn một lần tính f.}
+\end{frame}
+
+% ======================= PHẦN 4. BA CÁCH ĐÁNH ĐỔI =======================
+
+\begin{frame}{Khung chung cho ba chương tiếp theo}
+  \begin{center}
+    \large
+    thời gian $\;=\;$ số vòng lặp $\;\times\;$ giá mỗi vòng
+  \end{center}
+  \vspace{0.6em}
+  \begin{center}\small
+    \begin{tabular}{lll}
+      \toprule
+      Phương pháp & Đổi đi & Lấy về \\
+      \midrule
+      Quán tính (AGD) & một vector bộ nhớ & ít vòng lặp hơn 10 lần \\
+      Ngẫu nhiên hóa (SGD) & độ chính xác cuối & giá mỗi vòng rẻ $n/B$ lần \\
+      Bậc hai (Newton) & giá mỗi vòng đắt $\sim d$ lần & đúng một vòng lặp \\
+      \bottomrule
+    \end{tabular}
+  \end{center}
+  \note{Ba phương án nằm ở ba góc khác nhau của cùng một đánh đổi. Chương tổng
+    hợp chỉ việc đặt cả bốn lên chung hai trục.}
+\end{frame}
+
+\begin{frame}{Quán tính: cùng giá mỗi vòng, ít vòng hơn mười lần}
+  \centering
+  \resultgraphic[0.68]{momentum-formula_time}
+
+  \chotlai{AGD 286 vòng và $4{,}0$ giây, GD 3000 vòng và $42{,}1$ giây, cùng bước
+    $1/L$. $\beta = 0{,}9$ gần đúng ở đây do $\kappa = 267{,}5$ cho
+    $\beta^{*} = 0{,}885$.}
+  \note{Không nên đọc thành kết luận chung về 0,9. Với kappa = 10 thì
+    beta* = 0,52 và 0,9 sẽ sai rõ.}
+\end{frame}
+
+\begin{frame}{Khởi động lại: cơ chế bù cho việc không biết \texorpdfstring{$\mu$}{mu}}
+  \centering
+  \resultgraphic[0.68]{momentum-restart_iters}
+
+  \chotlai{Với $\beta_k = (k-1)/(k+2)$: 143 xuống 89 vòng, đình trệ thành hội tụ.
+    Với $\beta$ tính theo $\mu$: trùng nhau từng chữ số.}
+  \note{Điều kiện restart không kích hoạt lần nào khi beta đã đặt đúng theo mu.}
+\end{frame}
+
+\begin{frame}{Ngẫu nhiên hóa: kích thước lô đổi giá, không đổi sàn}
+  \centering
+  \resultgraphic[0.70]{batch-size_epochs}
+
+  \chotlai{Mọi $B$ dừng quanh $5\cdot10^{-4}$. $B=32$ tốn \num{250000} vòng và
+    $4{,}2$ giây; $B=2048$ tốn 3880 vòng và $2{,}2$ giây.}
+  \note{Bước đặt theo 1/L_B bù trừ giữa phương sai gradient và số bước.
+    L_max = 200056 so với L = 9,12, gấp 21947 lần, do một dòng ngoại lai.}
+\end{frame}
+
+\begin{frame}{Quy tắc giảm bước: kết luận phụ thuộc đúng một tham số}
+  \begin{center}\small
+    \begin{tabular}{lr}
+      \toprule
+      Quy tắc, sau 200 epoch & $f - \fstar$ \\
+      \midrule
+      Bậc thang, giảm nửa mỗi 40 epoch      & $8{,}5\cdot10^{-7}$ \\
+      Nghịch đảo, $\gamma = \mu\eta_0$      & $6{,}9\cdot10^{-6}$ \\
+      \textbf{Hằng số}                      & $1{,}1\cdot10^{-3}$ \\
+      Nghịch đảo, $\gamma = 1/\text{epoch}$ & $1{,}5\cdot10^{-2}$ \\
+      Căn bậc hai                           & $4{,}6\cdot10^{-1}$ \\
+      \bottomrule
+    \end{tabular}
+  \end{center}
+  \chotlai{Hai dòng nghịch đảo khác nhau đúng một tham số và cho hai kết luận
+    ngược nhau. $\gamma$ phải neo vào $\mu$, không vào số vòng mỗi epoch.}
+  \note{Ở 40 epoch bước hằng vẫn đang dẫn; chỉ từ khoảng 100 epoch thứ hạng mới
+    đảo. Bước hằng còn có phương sai giữa seed lớn hơn 3,7 lần.}
+\end{frame}
+
+\begin{frame}{Bậc hai: một vòng lặp, sai số bằng không}
+  \[
+    w_{1} = w_{0} - (\nabla^{2} f)^{-1}\nabla f(w_{0})
+          = \left(\tfrac{1}{n}X\trans X + \lambda I\right)^{-1}\tfrac{1}{n}X\trans y = \wstar
+  \]
+  \begin{center}\small
+    \begin{tabular}{lrl}
+      \toprule
+      Thành phần & Thời gian & Bậc \\
+      \midrule
+      Dựng $\frac{1}{n}X\trans X$ & $163{,}2$ ms & $\bigO(nd^{2})$ \\
+      Cholesky $116\times116$     & $0{,}2$ ms   & $\bigO(d^{3})$ \\
+      Một gradient                & $87{,}3$ ms  & $\bigO(nd)$ \\
+      \bottomrule
+    \end{tabular}
+  \end{center}
+  \chotlai{Một bước Newton $\approx 250$ ms, trong đó $\bigO(d^{3})$ chỉ chiếm
+    $0{,}2$ ms. Backtracking nhận bước đầy đủ ngay lần thử thứ nhất.}
+  \note{Đảo chiều khi d lên vài nghìn: Hessian tăng theo d^2, gradient theo d.}
+\end{frame}
+
+% ======================= PHẦN 5. SO SÁNH TỔNG HỢP =======================
+
+\begin{frame}{So sánh tổng hợp: theo số vòng lặp}
+  \centering
+  \resultgraphic[0.66]{headline_iters}
+  \note{Newton 1 vòng, AGD 286, backtracking 561, GD 2022, SGD 3880 nhưng không
+    tới đích.}
+\end{frame}
+
+\begin{frame}{So sánh tổng hợp: theo thời gian chạy}
+  \centering
+  \resultgraphic[0.62]{headline_time}
+
+  \chotlai{Thứ hạng \emph{không} đổi giữa hai trục ở bài này, vì giá mỗi vòng
+    chênh nhau ít hơn số vòng chênh nhau.}
+  \note{Một vòng Newton đắt hơn một vòng GD khoảng ba lần, nhưng GD cần nhiều hơn
+    hai nghìn lần số vòng. Thứ hạng sẽ đảo khi d lớn.}
+\end{frame}
+
+\begin{frame}{Bảng tổng hợp và đối chiếu lý thuyết}
+  \begin{columns}[T]
+    \begin{column}{0.5\textwidth}\small
+      \begin{tabular}{lrr}
+        \toprule
+        Cấu hình tốt nhất & Vòng & Giây \\
+        \midrule
+        Newton            & 1    & 0{,}25 \\
+        AGD               & 75   & 1{,}05 \\
+        GD backtracking   & 143  & 3{,}14 \\
+        GD $t=1{,}9/L$    & 331  & 4{,}75 \\
+        SGD               & \multicolumn{2}{c}{không đạt} \\
+        \bottomrule
+      \end{tabular}
+    \end{column}
+    \begin{column}{0.46\textwidth}\small
+      \begin{tabular}{lrr}
+        \toprule
+        $\kappa$ giảm & GD & dự đoán \\
+        \midrule
+        730 $\to$ 268 & 2{,}73 & 2{,}73 \\
+        268 $\to$ 90  & 2{,}98 & 2{,}98 \\
+        90 $\to$ 10   & 8{,}86 & 8{,}91 \\
+        \bottomrule
+      \end{tabular}
+      \vspace{0.5em}
+
+      GD tỷ lệ với $\kappa$, AGD với $\sqrt{\kappa}$.
+    \end{column}
+  \end{columns}
+  \chotlai{Số vòng lặp không đổi khi $n$ tăng 6 lần; thời gian tăng $5{,}2$ tới
+    $6{,}5$ lần, tức tuyến tính theo $n$.}
+\end{frame}
+
+% ======================= PHẦN 6. SO SÁNH THƯ VIỆN =======================
+
+\begin{frame}{Quy đổi hàm mục tiêu sang scikit-learn}
+  \begin{itemize}
+    \item \texttt{Ridge} cực tiểu $\norm{Xw-y}^{2} + \alpha\norm{w}^{2}$
+      $\Rightarrow$ $\alpha = \lambda n$.
+    \item \texttt{SGDRegressor} cực tiểu đúng $f(w)$ của nhóm
+      $\Rightarrow$ $\alpha = \lambda$.
+  \end{itemize}
+  \vspace{0.4em}
+  Hai ước lượng trong cùng thư viện cần hai hằng số khác nhau. Đặt sai
+  \textbf{không sinh lỗi}, chỉ lặng lẽ so hai bài toán khác nhau.
+  \vspace{0.6em}
+
+  \chotlai{Kiểm chứng bằng số:
+    $\norm{\hat{w}-\wstar}/\norm{\wstar} = 2{,}35\cdot10^{-15}$.}
+  \note{Phép kiểm này chạy tự động và làm dừng chương trình nếu không đạt.}
+\end{frame}
+
+\begin{frame}{Kết quả so với thư viện}
+  \begin{center}\small
+    \begin{tabular}{lrr}
+      \toprule
+      Phương pháp, $n = \num{1200000}$ & Giây & $f - \fstar$ \\
+      \midrule
+      Newton của nhóm            & $0{,}25$  & $0$ \\
+      \texttt{Ridge(cholesky)}   & $0{,}273$ & $4{,}2\cdot10^{-30}$ \\
+      \texttt{Ridge(lsqr)}       & $2{,}03$  & $1{,}1\cdot10^{-5}$ \\
+      \texttt{Ridge(sag)}        & $45{,}4$  & $4{,}0\cdot10^{-7}$ \\
+      \texttt{SGDRegressor} mặc định & $3{,}18$ & $6{,}2\cdot10^{20}$ \\
+      \bottomrule
+    \end{tabular}
+  \end{center}
+  \chotlai{Hai con số sát nhau ở hai dòng đầu là bằng chứng cả hai cài đúng, vì
+    \texttt{Ridge} mặc định cũng là nghiệm đóng qua Cholesky.}
+  \note{Mục đích tự cài không phải chạy nhanh hơn thư viện, mà là hiểu cơ chế
+    hội tụ và biết chọn tham số. SGDRegressor mặc định không đặt bước theo L.}
+\end{frame}
+
+% ======================= PHẦN 7. KẾT LUẬN =======================
+
+\begin{frame}{Hai vai trò của hệ số hiệu chỉnh}
+  \begin{columns}[T]
+    \begin{column}{0.52\textwidth}
+      \centering
+      \resultgraphic[0.55]{lambda-kappa_tradeoff}
+    \end{column}
+    \begin{column}{0.44\textwidth}\small
+      \begin{tabular}{rrrr}
+        \toprule
+        $\lambda$ & $\kappa$ & GD & RMSE \\
+        \midrule
+        0{,}001 & 2633 & --   & 3{,}4537 \\
+        0{,}032 & 268  & 766  & 3{,}4563 \\
+        0{,}1   & 90   & 257  & 3{,}4690 \\
+        10      & 1{,}9 & 5   & 4{,}4578 \\
+        \bottomrule
+      \end{tabular}
+    \end{column}
+  \end{columns}
+  \chotlai{Từ $0{,}001$ lên $0{,}1$: RMSE xấu $0{,}44\%$, $\kappa$ giảm 29 lần,
+    GD từ không hội tụ xuống 257 vòng.}
+  \note{Quy tắc một sai số chuẩn chọn lambda = 0,0316, nằm đúng trong khoảng đó.}
+\end{frame}
+
+\begin{frame}{Những điều rút ra}
+  \begin{itemize}
+    \item \textbf{Chọn tham số.} $\rho$ quan trọng hơn $c$; bước SGD theo
+      $1/L_{B}$ chứ không theo $1/L$; tốc độ giảm neo vào $\mu$; $\beta$ tính lại
+      theo bước mà line search thực sự chọn.
+    \item \textbf{Ba chỗ lệch khỏi lý thuyết}, cùng một lý do: cận lý thuyết là
+      cận cho trường hợp xấu nhất, thực nghiệm chạy trên một bài toán, một điểm
+      khởi tạo và một ngân sách cụ thể.
+    \item \textbf{Phạm vi.} Với $d = 116$ và $n$ cỡ triệu, phương pháp bậc hai
+      thắng áp đảo. Phương pháp lặp bậc một chỉ có lợi khi $d$ lớn tới mức không
+      dựng nổi $X\trans X$.
+  \end{itemize}
+  \vspace{0.4em}
+  \begin{center}
+    {\color{accent}\rule{0.4\textwidth}{1pt}}\par
+    \vspace{0.4em}
+    {\sffamily Cảm ơn thầy cô và các bạn đã lắng nghe.}
+  \end{center}
+\end{frame}
+
+\end{document}

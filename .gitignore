@@ -1,0 +1,40 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Data: too large for git, tải lại từ Kaggle theo README
+data/raw/*
+!data/raw/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+
+# Bộ mẫu văn phong: tài liệu tham chiếu riêng, phần lớn nguồn cấp phép CC BY-NC-ND
+style/mau/
+
+# Sản phẩm biên dịch LaTeX
+*.aux
+*.bbl
+*.bcf
+*.blg
+*.fdb_latexmk
+*.fls
+*.lof
+*.log
+*.lot
+*.nav
+*.out
+*.run.xml
+*.snm
+*.synctex.gz
+*.toc
+*.xdv
+report/*.pdf
+
+# macOS
+.DS_Store
+
+# Vùng làm việc của subagent-driven-development
+.superpowers/

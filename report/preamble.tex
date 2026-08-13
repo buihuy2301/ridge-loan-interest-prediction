@@ -1,0 +1,142 @@
+% Shared preamble for report.tex and slides.tex.
+% Compile both with XeLaTeX: latexmk -xelatex <file>.tex
+%
+% Visual identity, chosen to be distinct from the Discrete Mathematics template:
+%   text     TeX Gyre Pagella (a Palatino), wider and rounder than Times
+%   headings TeX Gyre Heros (a Helvetica), sans, to separate structure from prose
+%   maths    TeX Gyre Pagella Math through unicode-math, so the digits inside
+%            formulas match the digits in the surrounding sentence
+% All three ship with TeX Live, so nothing extra has to be installed.
+
+\usepackage{fontspec}
+\usepackage{polyglossia}
+\setmainlanguage{vietnamese}
+
+\setmainfont{texgyrepagella}[
+  Extension      = .otf,
+  UprightFont    = *-regular,
+  BoldFont       = *-bold,
+  ItalicFont     = *-italic,
+  BoldItalicFont = *-bolditalic,
+]
+\setsansfont{texgyreheros}[
+  Extension      = .otf,
+  UprightFont    = *-regular,
+  BoldFont       = *-bold,
+  ItalicFont     = *-italic,
+  BoldItalicFont = *-bolditalic,
+  Scale          = 0.92,
+]
+\setmonofont{texgyrecursor}[
+  Extension      = .otf,
+  UprightFont    = *-regular,
+  BoldFont       = *-bold,
+  Scale          = 0.88,
+]
+
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage{mathtools}
+\usepackage{unicode-math}
+\setmathfont{texgyrepagella-math.otf}
+
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{siunitx}
+\usepackage{xcolor}
+
+% Vietnamese decimal marker, so \num agrees with the decimals written by hand in
+% the prose (1{,}39 rather than 1.39).
+\sisetup{output-decimal-marker={,}}
+
+% Slide copies come first on purpose: \resultgraphic must prefer them.
+\graphicspath{{figures/}{../results/figures/slides/}{../results/figures/}}
+
+% ---------------------------------------------------------------------------
+% Palette. The three accents are the figure colours from src/figures.py, so a
+% method named in the text can be tinted to match its curve.
+% ---------------------------------------------------------------------------
+\definecolor{ink}{HTML}{1A1A1A}
+\definecolor{accent}{HTML}{0B5563}     % deep teal, the structural colour
+\definecolor{rule}{HTML}{9AA5A8}
+\definecolor{cGD}{HTML}{1F77B4}
+\definecolor{cSGD}{HTML}{FF7F0E}
+\definecolor{cAGD}{HTML}{2CA02C}
+\definecolor{cNewton}{HTML}{D62728}
+
+% ---------------------------------------------------------------------------
+% Notation, kept identical to KE_HOACH_TRIEN_KHAI.md
+% ---------------------------------------------------------------------------
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\wstar}{w^{*}}
+\newcommand{\fstar}{f^{*}}
+\newcommand{\bigO}{\mathcal{O}}
+\newcommand{\Batch}{\mathcal{B}}
+\newcommand{\trans}{^{\top}}
+\DeclareMathOperator*{\argmin}{arg\,min}
+\DeclareMathOperator{\sign}{sign}
+\DeclarePairedDelimiter{\norm}{\lVert}{\rVert}
+\DeclarePairedDelimiter{\abs}{\lvert}{\rvert}
+
+% ---------------------------------------------------------------------------
+% Figures. A stem that has not been generated yet leaves a visible placeholder
+% rather than a compilation error, so the report can be drafted while the
+% experiments are still running.
+% ---------------------------------------------------------------------------
+\newcommand{\missingfigbox}[1]{%
+  \fcolorbox{rule}{white}{\parbox[c][3.2cm][c]{0.86\linewidth}{\centering
+    \ttfamily\small\detokenize{#1}.pdf\par\vspace{4pt}
+    \rmfamily\small chưa được sinh ra từ notebook\par}}%
+}
+
+% The path is spelled out rather than left to \graphicspath, which lists the
+% slide directory first and would otherwise hand the report the wide, reduced
+% copies meant for Beamer.
+%
+% Placement is [tbp] with no 'h': a figure declared between two paragraphs of one
+% argument would otherwise be typeset right there and cut the argument in half.
+\newcommand{\resultfig}[3]{%
+  \begin{figure}[tbp]
+    \centering
+    \IfFileExists{../results/figures/#1.pdf}
+      {\includegraphics[width=0.82\linewidth]{../results/figures/#1.pdf}}
+      {\missingfigbox{#1}}
+    \caption{#2}
+    \label{#3}
+  \end{figure}%
+}
+
+% The mandatory pair, stacked rather than side by side. The source figures are
+% 6 by 4 inches with 10 pt labels; at half the text width that becomes about 5 pt
+% and the legends stop being readable, which defeats the purpose of printing two
+% panels. Stacking costs most of a page per comparison and keeps both legible.
+\newcommand{\panellabel}[1]{{\sffamily\small\color{accent}#1}}
+\newcommand{\resultpair}[3]{%
+  \begin{figure}[tbp]
+    \centering
+    \panellabel{(a) theo số vòng lặp}\par\vspace{2pt}
+    \IfFileExists{../results/figures/#1_iters.pdf}
+      {\includegraphics[width=0.8\linewidth]{../results/figures/#1_iters.pdf}}
+      {\missingfigbox{#1_iters}}
+    \par\vspace{10pt}
+    \panellabel{(b) theo thời gian chạy}\par\vspace{2pt}
+    \IfFileExists{../results/figures/#1_time.pdf}
+      {\includegraphics[width=0.8\linewidth]{../results/figures/#1_time.pdf}}
+      {\missingfigbox{#1_time}}
+    \caption{#2}
+    \label{#3}
+  \end{figure}%
+}
+
+% Slides: figures are 6 by 4 inches, so a full-width copy is too tall for a frame
+% that also carries text. Height is capped as a fraction of the text height and
+% the aspect ratio kept; crowded frames pass a smaller fraction.
+\newcommand{\resultgraphic}[2][0.72]{%
+  \IfFileExists{../results/figures/slides/#2.pdf}
+    {\includegraphics[width=\linewidth,height=#1\textheight,keepaspectratio]{../results/figures/slides/#2.pdf}}
+    {\IfFileExists{../results/figures/#2.pdf}
+      {\includegraphics[width=\linewidth,height=#1\textheight,keepaspectratio]{../results/figures/#2.pdf}}
+      {\missingfigbox{#2}}}%
+}
