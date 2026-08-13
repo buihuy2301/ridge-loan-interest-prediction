@@ -17,7 +17,7 @@ import time
 import numpy as np
 
 from .direction import Direction
-from .objective import RidgeObjective
+from .objective import SmoothObjective
 from .record import RunRecord
 from .stepsize import StepRule
 
@@ -40,23 +40,23 @@ class _Clock:
         self._started = None
 
 
-def warm_up(objective: RidgeObjective, repeats: int = 3) -> None:
+def warm_up(objective: SmoothObjective, repeats: int = 3) -> None:
     """Touch the expensive paths once so the first timed iteration is not special.
 
     The first numpy call pays initialisation and cache-warming costs that would
-    otherwise land entirely on iteration zero. Both primitives are exercised,
-    the memory-bound pass over X and the BLAS-3 product behind the Hessian, so
-    the loop does not need to know which one the direction will use.
+    otherwise land entirely on iteration zero. Both primitives are exercised, the
+    memory-bound pass over X and the BLAS-3 product behind the Hessian, so the
+    loop does not need to know which one the direction will use.
     """
     probe = np.zeros(objective.d)
     for _ in range(repeats):
         objective.value_and_gradient(probe)
-    objective.compute_hessian()
-    _ = objective.w_star  # forces the Gram matrix and its factorisation
+    objective.compute_hessian(probe)
+    _ = objective.w_star  # forces the reference solution and its factorisation
 
 
 def iterate(
-    objective: RidgeObjective,
+    objective: SmoothObjective,
     direction: Direction,
     step_rule: StepRule,
     *,

@@ -35,6 +35,56 @@ class LocalObjective(Protocol):
         ...
 
 
+class SmoothObjective(Protocol):
+    """Everything `iterate` and the `Direction` classes ask of an objective.
+
+    Two implementations exist. `RidgeObjective` gets every constant below in
+    closed form because it is a quadratic; `HuberObjective` finds the same
+    quantities numerically. Nothing in the loop distinguishes them, which is what
+    makes the two problems comparable: the same code path produces both sets of
+    curves.
+    """
+
+    X: np.ndarray
+    n: int
+    d: int
+    lam: float
+
+    @property
+    def n_rows(self) -> int: ...
+
+    @property
+    def L(self) -> float: ...
+
+    @property
+    def mu(self) -> float: ...
+
+    @property
+    def kappa(self) -> float: ...
+
+    @property
+    def w_star(self) -> np.ndarray: ...
+
+    @property
+    def f_star(self) -> float: ...
+
+    def value(self, w: np.ndarray) -> float: ...
+
+    def gradient(self, w: np.ndarray) -> np.ndarray: ...
+
+    def value_and_gradient(self, w: np.ndarray) -> tuple[float, np.ndarray]: ...
+
+    def compute_hessian(self, w: np.ndarray | None = None) -> np.ndarray: ...
+
+    def solve_hessian(self, rhs: np.ndarray) -> np.ndarray: ...
+
+    def suboptimality(self, w: np.ndarray) -> float: ...
+
+    def batch(self, indices: np.ndarray) -> LocalObjective: ...
+
+    def summary(self) -> dict: ...
+
+
 class RidgeObjective:
     """f, its derivatives, and the constants L, mu, kappa for a fixed (X, y, lam)."""
 
@@ -83,13 +133,16 @@ class RidgeObjective:
 
     # --------------------------------------------------------------- Hessian
 
-    def compute_hessian(self) -> np.ndarray:
+    def compute_hessian(self, w: np.ndarray | None = None) -> np.ndarray:
         """Form (1/n) X^T X + lam I from scratch.
 
+        `w` is accepted and ignored: the Hessian of a quadratic is the same
+        everywhere. The Huber objective needs the argument, and taking it here as
+        well is what lets `NewtonStep` drive both without an `isinstance` check.
+
         Newton with `reuse_factorization=False` calls this every iteration on
-        purpose: the Hessian of a quadratic is constant, so reusing it is correct
-        here but would not be in the general case, and the report compares the
-        cost of both choices.
+        purpose: reusing the factorisation is correct on this objective but would
+        not be in the general case, and the report compares the cost of both.
         """
         gram = self.X.T @ self.X / self.n
         gram.flat[:: self.d + 1] += self.lam
@@ -207,17 +260,20 @@ class BatchObjective:
         return value, gradient
 
 
-def max_row_smoothness(objective: RidgeObjective) -> float:
+def max_row_smoothness(objective: SmoothObjective) -> float:
     """L_max, the largest per-sample Lipschitz constant max_i ||x_i||^2 + lam.
 
     A step size that is safe for the full gradient can still make SGD with a
     small batch diverge, because L_max is an extreme while L is an average. The
     mini-batch bound in `batch_smoothness` interpolates between the two.
+
+    The bound holds for the Huber objective as well: its per-row Hessian is
+    s_i x_i x_i^T with s_i in [0, 1], so no row is steeper than in the Ridge case.
     """
     return float(np.max(np.einsum("ij,ij->i", objective.X, objective.X))) + objective.lam
 
 
-def batch_smoothness(objective: RidgeObjective, batch_size: int) -> float:
+def batch_smoothness(objective: SmoothObjective, batch_size: int) -> float:
     """L_B = L + (L_max - L) / B, the smoothness seen by a batch of size B."""
     L_max = max_row_smoothness(objective)
     return objective.L + (L_max - objective.L) / batch_size

@@ -128,3 +128,15 @@ def test_rejects_non_positive_regularisation(objective, kwargs, message):
 def test_rejects_float32_because_it_would_fake_a_convergence_floor(objective):
     with pytest.raises(ValueError, match="float64"):
         RidgeObjective(objective.X.astype(np.float32), objective.y, lam=1e-2)
+
+
+def test_compute_hessian_ignores_the_point_it_is_given(objective, probe):
+    """A quadratic has a constant Hessian, and the Ridge class says so by ignoring w.
+
+    The argument exists because the Huber objective needs it. Ridge accepting and
+    discarding it is what lets one loop drive both.
+    """
+    at_probe = objective.compute_hessian(probe)
+    at_zero = objective.compute_hessian(np.zeros(objective.d))
+    assert np.array_equal(at_probe, at_zero)
+    assert np.array_equal(at_probe, objective.compute_hessian())

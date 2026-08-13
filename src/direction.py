@@ -15,7 +15,7 @@ from typing import Protocol
 import numpy as np
 from scipy.linalg import cho_factor, cho_solve
 
-from .objective import LocalObjective, RidgeObjective
+from .objective import LocalObjective, SmoothObjective
 
 
 @dataclass(frozen=True, slots=True)
@@ -63,7 +63,7 @@ class Direction(Protocol):
 class SteepestDescent:
     """Full-batch gradient descent: p = -grad f(w)."""
 
-    def __init__(self, objective: RidgeObjective) -> None:
+    def __init__(self, objective: SmoothObjective) -> None:
         self.objective = objective
         self.label = "GD"
 
@@ -94,7 +94,7 @@ class MiniBatch:
 
     def __init__(
         self,
-        objective: RidgeObjective,
+        objective: SmoothObjective,
         batch_size: int,
         seed: int = 0,
     ) -> None:
@@ -159,7 +159,7 @@ class Nesterov:
 
     def __init__(
         self,
-        objective: RidgeObjective,
+        objective: SmoothObjective,
         rule: str = "strongly_convex",
         beta: float = 0.9,
         restart: bool = False,
@@ -229,20 +229,21 @@ class Nesterov:
 
 
 class NewtonStep:
-    """Newton direction: p solves H p = -grad f(w), with H = (1/n) X^T X + lam I.
+    """Newton direction: p solves H(w) p = -grad f(w).
 
     The system is solved by Cholesky rather than by forming an inverse, which is
     both cheaper and better conditioned.
 
-    On this objective H is constant, so `reuse_factorization=True` factors once
-    and reuses it. That is correct here but would not be for a general function,
-    so the default refactors every iteration and the report compares the cost of
-    both. Refactoring touches X a second time, which `n_rows` reflects.
+    `reuse_factorization=True` factors once and reuses it. On the Ridge objective
+    that is exact, because a quadratic has a constant Hessian. On the Huber
+    objective the same flag turns Newton into the chord method: still a descent
+    direction, but the quadratic convergence is gone. The report compares both.
+    Refactoring touches X a second time, which `n_rows` reflects.
     """
 
     def __init__(
         self,
-        objective: RidgeObjective,
+        objective: SmoothObjective,
         reuse_factorization: bool = False,
     ) -> None:
         self.objective = objective
@@ -256,7 +257,7 @@ class NewtonStep:
             direction = self.objective.solve_hessian(-gradient)
             n_rows = self.objective.n
         else:
-            factor = cho_factor(self.objective.compute_hessian(), lower=True)
+            factor = cho_factor(self.objective.compute_hessian(w), lower=True)
             direction = cho_solve(factor, -gradient)
             n_rows = 2 * self.objective.n
 
