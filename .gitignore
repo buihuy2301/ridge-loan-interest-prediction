@@ -5,35 +5,38 @@ __pycache__/
 .pytest_cache/
 .ipynb_checkpoints/
 
-# Data: too large for git, tải lại từ Kaggle theo README
+# Data
 data/raw/*
 !data/raw/.gitkeep
-data/processed/*
-!data/processed/.gitkeep
+data/processed/*.npy
 
-# Bộ mẫu văn phong: tài liệu tham chiếu riêng, phần lớn nguồn cấp phép CC BY-NC-ND
-style/mau/
-
-# Sản phẩm biên dịch LaTeX
+# LaTeX build artifacts
 *.aux
+*.log
+*.out
+*.nav
+*.snm
+*.toc
+*.lof
+*.lot
 *.bbl
 *.bcf
 *.blg
 *.fdb_latexmk
 *.fls
-*.lof
-*.log
-*.lot
-*.nav
-*.out
 *.run.xml
-*.snm
 *.synctex.gz
-*.toc
+*.vrb
 *.xdv
+_minted*/
+
+# Style reference material (see docs/van-phong-tieng-viet.md).
+# Only the sample corpus is ignored: its sources are third-party PDFs under
+# CC BY-NC-ND. The control set is our own drafting, so it is tracked.
+style/mau/
 
 # macOS
 .DS_Store
+.claude
 
-# Vùng làm việc của subagent-driven-development
-.superpowers/
+homework
