@@ -35,14 +35,34 @@ class LocalObjective(Protocol):
         ...
 
 
-class SmoothObjective(Protocol):
-    """Everything `iterate` and the `Direction` classes ask of an objective.
+class BatchView(Protocol):
+    """One mini-batch, as the algorithm that drew it sees it.
 
-    Two implementations exist. `RidgeObjective` gets every constant below in
-    closed form because it is a quadratic; `HuberObjective` finds the same
-    quantities numerically. Nothing in the loop distinguishes them, which is what
-    makes the two problems comparable: the same code path produces both sets of
-    curves.
+    Wider than `LocalObjective` on purpose. A direction needs the gradient on its
+    batch; a line search handed the same object may only read `value`, and the
+    narrower protocol is what keeps that restriction visible at the call site.
+    """
+
+    @property
+    def n_rows(self) -> int: ...
+
+    def value(self, w: np.ndarray) -> float: ...
+
+    def value_and_gradient(self, w: np.ndarray) -> tuple[float, np.ndarray]: ...
+
+
+class SmoothObjective(Protocol):
+    """What `RidgeObjective` and a future `HuberObjective` have in common.
+
+    `iterate` and the `Direction` classes are typed against this protocol and use
+    most of it directly: `value_and_gradient`, `compute_hessian`, `solve_hessian`,
+    `suboptimality`, and the constants `L`, `mu`, `kappa`, `w_star`, `f_star`.
+    `n_rows` and `summary` are declared here too, for callers elsewhere in the
+    project that need them on any objective, not because this protocol's own
+    consumers read them. `RidgeObjective` gets every constant in closed form
+    because it is a quadratic; `HuberObjective` will find the same quantities
+    numerically. Nothing in the loop distinguishes them, which is what makes the
+    two problems comparable: the same code path produces both sets of curves.
     """
 
     X: np.ndarray
@@ -80,7 +100,7 @@ class SmoothObjective(Protocol):
 
     def suboptimality(self, w: np.ndarray) -> float: ...
 
-    def batch(self, indices: np.ndarray) -> LocalObjective: ...
+    def batch(self, indices: np.ndarray) -> BatchView: ...
 
     def summary(self) -> dict: ...
 
@@ -165,12 +185,25 @@ class RidgeObjective:
     # ------------------------------------------------- optimum and constants
 
     @cached_property
-    def w_star(self) -> np.ndarray:
+    def _optimum(self) -> np.ndarray:
         return self.solve_hessian(self.X.T @ self.y / self.n)
 
+    @property
+    def w_star(self) -> np.ndarray:
+        # SmoothObjective declares this as a `@property`, and a protocol property
+        # is not satisfied by `cached_property` (pyright rejects it even though
+        # both are read-only from the caller's side). The expensive part still
+        # runs once, cached on `_optimum`; this wrapper exists only so the class
+        # satisfies the protocol. Do not collapse it back into `cached_property`.
+        return self._optimum
+
     @cached_property
-    def f_star(self) -> float:
+    def _optimal_value(self) -> float:
         return self.value(self.w_star)
+
+    @property
+    def f_star(self) -> float:
+        return self._optimal_value
 
     @cached_property
     def _gram_eigenvalues(self) -> np.ndarray:
@@ -178,17 +211,17 @@ class RidgeObjective:
         gram.flat[:: self.d + 1] -= self.lam
         return np.linalg.eigvalsh(gram)
 
-    @cached_property
+    @property
     def L(self) -> float:
         """Lipschitz constant of the gradient."""
         return float(self._gram_eigenvalues[-1]) + self.lam
 
-    @cached_property
+    @property
     def mu(self) -> float:
         """Strong convexity constant."""
         return float(self._gram_eigenvalues[0]) + self.lam
 
-    @cached_property
+    @property
     def kappa(self) -> float:
         return self.L / self.mu
 
