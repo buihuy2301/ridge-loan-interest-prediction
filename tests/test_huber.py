@@ -11,7 +11,7 @@ import numpy as np
 import pytest
 
 from src.huber import HuberObjective
-from src.objective import RidgeObjective
+from src.objective import RidgeObjective, SmoothObjective
 
 EPS = 1e-6
 LAM = 1e-2
@@ -149,3 +149,96 @@ def test_summary_records_what_the_report_needs(objective):
                 "mu_at_optimum", "f_star", "outside_fraction"):
         assert key in summary
     assert 0.0 <= summary["outside_fraction"] <= 1.0
+
+
+def test_a_batch_over_every_row_is_the_full_objective(objective, probe):
+    batch = objective.batch(np.arange(objective.n))
+    value, gradient = batch.value_and_gradient(probe)
+    full_value, full_gradient = objective.value_and_gradient(probe)
+    # rel alone would not govern here: pytest.approx and np.allclose both fall
+    # back to a nonzero absolute floor (1e-12 and 1e-8 respectively) that
+    # swallows a wrong-by-1e-9 gradient on quantities of this size, so the
+    # floor is pinned to zero to make the relative tolerance the real check.
+    assert value == pytest.approx(full_value, rel=1e-12, abs=0.0)
+    assert np.allclose(gradient, full_gradient, rtol=1e-12, atol=0.0)
+    assert batch.n_rows == objective.n
+
+
+def test_a_batch_keeps_the_penalty_whole(objective):
+    """Scaling the penalty by |B|/n would bias the gradient estimate.
+
+    Checked against the full objective restricted to the same rows: a batch of
+    fifty rows must be the fifty-row problem carrying the whole penalty, not one
+    fiftieth of it.
+    """
+    rows = np.arange(50)
+    batch = objective.batch(rows)
+    same_rows = HuberObjective(
+        objective.X[rows].copy(), objective.y[rows].copy(), objective.lam, objective.delta
+    )
+    w = np.ones(objective.d)
+    assert batch.value(w) == pytest.approx(same_rows.value(w), rel=1e-12, abs=0.0)
+
+    penalty = objective.lam / 2 * float(w @ w)
+    assert batch.value(w) > penalty
+
+
+def test_choose_delta_leaves_a_real_fraction_outside_the_quadratic_zone(data):
+    from src.huber import choose_delta
+
+    X, y = data
+    ridge = RidgeObjective(X, y, lam=LAM)
+    delta = choose_delta(ridge)
+    outside = float(np.mean(np.abs(X @ ridge.w_star - y) > delta))
+    assert 0.05 < outside < 0.4
+
+
+def test_build_huber_reuses_a_stored_reference(data, tmp_path):
+    from src.huber import build_huber
+
+    X, y = data
+    path = tmp_path / "huber_reference.json"
+    first = build_huber(X, y, lam=LAM, path=path, verbose=False)
+    assert path.exists()
+    assert first.reference_iters >= 1
+
+    second = build_huber(X, y, lam=LAM, path=path, verbose=False)
+    assert second.delta == first.delta
+    assert np.allclose(second.w_star, first.w_star)
+    assert second.reference_iters == first.reference_iters
+
+
+def test_build_huber_solves_again_when_the_stored_problem_differs(data, tmp_path):
+    import json as json_module
+
+    from src.huber import build_huber
+
+    X, y = data
+    path = tmp_path / "huber_reference.json"
+    build_huber(X, y, lam=LAM, path=path, verbose=False)
+    other = build_huber(X, y, lam=10 * LAM, path=path, verbose=False)
+
+    assert other.lam == pytest.approx(10 * LAM)
+    assert json_module.loads(path.read_text())["lam"] == pytest.approx(10 * LAM)
+    assert np.linalg.norm(other.gradient(other.w_star)) <= 1e-13
+
+
+def test_both_objectives_satisfy_the_shared_protocol(
+    data: tuple[np.ndarray, np.ndarray], objective: HuberObjective
+):
+    """The protocol exists so one loop can drive both problems; this is what checks it.
+
+    The call does nothing at runtime. Its value is static: pyright rejects the
+    argument if either class drifts out of conformance, which is the failure this
+    protocol was introduced to prevent and which no other test would notice.
+    `objective` must carry its `HuberObjective` annotation here rather than being
+    left implicit, since an unannotated parameter is typed `Unknown` and pyright
+    would silently pass any argument through the `accepts` call below without
+    ever consulting `SmoothObjective` at all.
+    """
+    def accepts(problem: SmoothObjective) -> int:
+        return problem.d
+
+    X, y = data
+    assert accepts(RidgeObjective(X, y, lam=LAM)) == objective.d
+    assert accepts(objective) == objective.d

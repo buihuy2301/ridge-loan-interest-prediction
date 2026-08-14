@@ -220,6 +220,9 @@ class HuberObjective:
         penalty = self.lam / 2 * float((w - self.w_star) @ (w + self.w_star))
         return float(rows.sum() / self.n + penalty)
 
+    def batch(self, indices: np.ndarray) -> "HuberBatchObjective":
+        return HuberBatchObjective(self, indices)
+
     def summary(self) -> dict:
         """Constants worth recording alongside a group of runs."""
         return {
@@ -273,3 +276,122 @@ def solve_reference(
         f"reference solve did not reach {tol:g} in {max_iter} iterations; "
         f"last gradient norm was {grad_norm:.3e}"
     )
+
+
+class HuberBatchObjective:
+    """The Huber objective restricted to one mini-batch of rows.
+
+    The regularisation term is kept whole rather than scaled by |B|/n, so this is
+    an unbiased estimate of the full gradient when the batch is drawn uniformly.
+    A line search handed this object only guarantees decrease on the batch, never
+    on f itself; see section 4.1 of KE_HOACH_TRIEN_KHAI.md.
+    """
+
+    __slots__ = ("parent", "X", "y", "lam", "delta", "size")
+
+    def __init__(self, parent: HuberObjective, indices: np.ndarray) -> None:
+        self.parent = parent
+        self.X = parent.X[indices]
+        self.y = parent.y[indices]
+        self.lam = parent.lam
+        self.delta = parent.delta
+        self.size = len(indices)
+
+    @property
+    def n_rows(self) -> int:
+        return self.size
+
+    def _loss(self, residual: np.ndarray) -> np.ndarray:
+        size = np.abs(residual)
+        return np.where(
+            size <= self.delta,
+            0.5 * residual * residual,
+            self.delta * (size - 0.5 * self.delta),
+        )
+
+    def value(self, w: np.ndarray) -> float:
+        residual = self.X @ w - self.y
+        return float(self._loss(residual).sum() / self.size + self.lam / 2 * (w @ w))
+
+    def value_and_gradient(self, w: np.ndarray) -> tuple[float, np.ndarray]:
+        residual = self.X @ w - self.y
+        value = float(self._loss(residual).sum() / self.size + self.lam / 2 * (w @ w))
+        gradient = self.X.T @ np.clip(residual, -self.delta, self.delta) / self.size + self.lam * w
+        return value, gradient
+
+
+def choose_delta(ridge: RidgeObjective, factor: float = 1.345) -> float:
+    """delta = 1.345 * a robust estimate of the residual scale.
+
+    The constant is the classical one: it gives 95 percent asymptotic efficiency
+    against the squared loss when the noise really is Gaussian, while still
+    clipping the tail. Scale is estimated from the median absolute deviation
+    rather than the standard deviation, because the heavy tail this loss exists
+    to handle would otherwise set the threshold meant to clip it.
+    """
+    residual = ridge.X @ ridge.w_star - ridge.y
+    spread = float(np.median(np.abs(residual - np.median(residual))))
+    return factor * spread / 0.6745
+
+
+def build_huber(
+    X: np.ndarray,
+    y: np.ndarray,
+    lam: float,
+    path: str | Path = REFERENCE_PATH,
+    verbose: bool = True,
+) -> HuberObjective:
+    """The frozen Huber problem: delta and w* read from disk, or solved and written.
+
+    Section 1 of KE_HOACH_TRIEN_KHAI.md requires the objective to be fixed before
+    any timing run starts. Recomputing delta on every call would satisfy that in
+    practice, since the inputs are frozen too, but writing it down makes the
+    requirement checkable and saves the Newton solve on every rerun.
+
+    A stored file describing a different problem is ignored rather than trusted:
+    silently reusing the wrong w* would put every curve in the chapter on the
+    wrong axis.
+    """
+    path = Path(path)
+    log = print if verbose else (lambda *a, **k: None)
+    n, d = X.shape
+
+    if path.exists():
+        stored = json.loads(path.read_text())
+        matches = (
+            stored["n"] == n
+            and stored["d"] == d
+            and np.isclose(stored["lam"], lam, rtol=1e-12)
+        )
+        if matches:
+            log(f"huber: reference read from {path}")
+            objective = HuberObjective(X, y, lam, stored["delta"], w_star=stored["w_star"])
+            objective.reference_grad_norm = stored["grad_norm"]
+            objective.reference_iters = stored["iters"]
+            return objective
+        log(f"huber: {path} describes a different problem, solving again")
+
+    objective = HuberObjective(X, y, lam, choose_delta(RidgeObjective(X, y, lam)))
+    w_star, grad_norm, iters = solve_reference(objective)
+    objective._w_star = w_star
+    objective.reference_grad_norm = grad_norm
+    objective.reference_iters = iters
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(
+            {
+                "n": n,
+                "d": d,
+                "lam": objective.lam,
+                "delta": objective.delta,
+                "grad_norm": grad_norm,
+                "iters": iters,
+                "f_star": objective.f_star,
+                "w_star": [float(v) for v in w_star],
+            },
+            indent=1,
+        )
+    )
+    log(f"huber: delta = {objective.delta:.4f}, solved in {iters} iterations, written to {path}")
+    return objective
