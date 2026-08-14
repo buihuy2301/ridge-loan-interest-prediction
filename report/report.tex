@@ -164,9 +164,10 @@ trên mẫu nhỏ, và chỉ cấu hình tốt nhất mới phải chạy lại 
 Nghiệm đóng \eqref{eq:closed} giải bằng phân rã Cholesky cho
 $\norm{\nabla f(\wstar)} = 7{,}4 \cdot 10^{-13}$, tức ở mức sai số máy. Nhờ con số
 đó, báo cáo đo được sai số tuyệt đối $f(w_k) - \fstar$ của từng thuật toán thay vì
-chỉ so sánh các đường cong với nhau. Nếu đổi sang hàm mất mát không có nghiệm đóng, chẳng hạn Huber hay Lasso,
-thì $\fstar$ phải ước lượng bằng chính lần chạy dài nhất, và sai số của mọi
-sai số của đường tốt nhất chặn dưới mọi đường còn lại.
+chỉ so sánh các đường cong với nhau. Nếu đổi sang hàm mất mát không có nghiệm
+đóng, chẳng hạn Huber hay Lasso, thì $\fstar$ phải giải bằng số trước khi vẽ được
+bất cứ đường nào; chương~\ref{ch:huber} giải nó bằng một lần chạy Newton riêng tới
+sai số máy.
 
 \section{Cách đo sai số}
 
@@ -705,7 +706,8 @@ Hình~\ref{fig:newton} vẽ cả bốn biến thể. Backtracking cũng vì th�
 không có việc gì để làm: điều kiện giảm đủ thỏa ngay ở lần thử thứ nhất, đo được
 đúng một lần đánh giá hàm mục tiêu cho toàn bộ lần chạy. Phần backtracking cho
 Newton vì thế chỉ có nội dung khi hàm mục tiêu không còn bậc hai, chẳng
-hạn khi thay mất mát bình phương bằng mất mát Huber.
+hạn khi thay mất mát bình phương bằng mất mát Huber; chương~\ref{ch:huber} chạy
+lại đúng bốn biến thể này trên hàm mục tiêu đó.
 
 \resultpair{newton-damping}{Newton với bước đầy đủ và bước damped, hai cách xử lý
   Hessian.}{fig:newton}
@@ -747,6 +749,298 @@ trước khi bấm đồng hồ đã tính sẵn ma trận đó. Biến thể d�
 đo được $0{,}40$ giây, cao hơn $250$ ms vì vòng lặp gọi thêm một lần đề xuất bước
 ở vòng thứ hai chỉ để kiểm tra điều kiện dừng, và với Newton thì lần gọi đó kéo
 theo cả việc dựng lại Hessian. Con số dùng để so sánh trong báo cáo là $250$ ms.
+
+% ===========================================================================
+\chapter{Khi hàm mục tiêu không còn là hàm bậc hai}\label{ch:huber}
+% ===========================================================================
+
+\section{Mất mát Huber trên cùng bộ dữ liệu}\label{sec:huber-loss}
+
+Hàm mục tiêu thứ hai của báo cáo giữ nguyên ma trận thiết kế, vector mục tiêu và
+hệ số $\lambda = 0{,}031623$ của \eqref{eq:objective}, chỉ thay mất mát bình
+phương bằng mất mát Huber \cite{huber1964robust}:
+\begin{equation}\label{eq:huber}
+  f_{H}(w) = \frac{1}{n} \sum_{i=1}^{n} H_{\delta}\!\left( x_i\trans w - y_i \right)
+    + \frac{\lambda}{2} \norm{w}^{2},
+  \qquad
+  H_{\delta}(r) =
+  \begin{cases}
+    \tfrac{1}{2} r^{2}, & \abs{r} \le \delta, \\[2pt]
+    \delta \left( \abs{r} - \tfrac{\delta}{2} \right), & \abs{r} > \delta .
+  \end{cases}
+\end{equation}
+Phần dư nhỏ hơn ngưỡng $\delta$ vẫn bị phạt theo bình phương, phần dư lớn hơn chỉ
+bị phạt tuyến tính, nên một khoản vay ngoại lai không còn kéo được nghiệm về phía
+nó. Với báo cáo này thì tính chất thống kê đó là phần phụ; nhóm chọn
+\eqref{eq:huber} vì nó bỏ đúng một tính chất, tính bậc hai, mà giữ nguyên dữ
+liệu, số chiều và hệ số hiệu chỉnh, nên mọi chênh lệch đo được sau đây quy về đúng
+một nguyên nhân.
+
+Ngưỡng đặt $\delta = 4{,}0666$, bằng $1{,}345$ lần ước lượng bền vững của độ tán
+phần dư, tức trung vị độ lệch tuyệt đối chia cho $0{,}6745$. Hằng số $1{,}345$ là
+hằng số cổ điển, cho hiệu quả tiệm cận 95 phần trăm so với mất mát bình phương
+khi nhiễu thật sự là nhiễu Gauss \cite{huber1964robust}. Độ tán ước lượng qua
+trung vị độ lệch tuyệt đối chứ không qua độ lệch chuẩn, vì chính cái đuôi nặng mà
+hàm mất mát này sinh ra để xử lý sẽ đẩy độ lệch chuẩn lên và kéo theo cả ngưỡng
+đáng lẽ dùng để cắt nó. Tại $\wstar$, ngưỡng đó đặt $19{,}6$ phần trăm số dòng ra
+ngoài vùng bậc hai, nên hàm mục tiêu khác Ridge trên số liệu chứ không chỉ khác
+trên công thức.
+
+\begin{table}[tbp]
+  \centering
+  \caption{Ba hằng số của hai hàm mục tiêu trên cùng bộ dữ liệu, với
+    $n = \num{200000}$, $d = 116$ và $\lambda = 0{,}031623$ cho cả hai. Cặp cột
+    $\mu$ và $\kappa$ thứ nhất là cận bảo đảm, thứ mà thuật toán dùng được; cặp
+    thứ hai đo tại $\wstar$. Với Ridge hai cặp trùng nhau vì Hessian là hằng số.}
+  \label{tab:huber-constants}
+  \begin{tabular}{lrrrrrrr}
+    \toprule
+    & & & \multicolumn{2}{c}{Cận bảo đảm} & \multicolumn{2}{c}{Đo tại $\wstar$} & \\
+    \cmidrule(lr){4-5}\cmidrule(lr){6-7}
+    Hàm mục tiêu & $\delta$ & $L$ & $\mu$ & $\kappa$ & $\mu$ & $\kappa$ & $\fstar$ \\
+    \midrule
+    Ridge & \multicolumn{1}{c}{--} & 9{,}1156 & 0{,}034073 & 267{,}5 & 0{,}034073 & 267{,}5 & 6{,}151114 \\
+    Huber & 4{,}0666               & 9{,}1156 & 0{,}031623 & 288{,}3 & 0{,}033609 & 271{,}2 & 5{,}196306 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Hằng số Lipschitz của hai bài toán bằng nhau tới chữ số cuối, $9{,}1156$, trong
+khi $\mu$ tụt từ $0{,}034073$ xuống $0{,}031623$ và $\kappa$ vì thế tăng từ
+$267{,}5$ lên $288{,}3$ (bảng~\ref{tab:huber-constants}). Mỗi dòng dữ liệu đi vào
+Hessian của \eqref{eq:huber} với trọng số $1$ hoặc $0$ tùy phần dư của nó nằm
+trong hay ngoài vùng bậc hai, nên Hessian Huber không bao giờ vượt Hessian Ridge
+theo thứ tự nửa xác định dương và cận trên của Ridge dùng lại được nguyên vẹn.
+Cận dưới thì không dùng lại được. Trường hợp xấu nhất là mọi dòng đều nằm ngoài
+vùng bậc hai, khi đó phần mất mát không góp chút độ cong nào và chỉ còn số hạng
+hiệu chỉnh, nên $\mu$ chỉ bảo đảm được ở mức $\lambda$.
+
+Đo tại $\wstar$, trị riêng nhỏ nhất của Hessian là $0{,}033609$, lớn hơn cận bảo
+đảm $6{,}3$ phần trăm, và số điều kiện thật là $271{,}2$ chứ không phải $288{,}3$.
+Khoảng cách giữa hai con số có nguồn rõ ràng, vì tại $\wstar$ chỉ $19{,}6$ phần
+trăm số dòng rơi ra ngoài vùng bậc hai còn hơn bốn phần năm số dòng vẫn góp độ
+cong đúng như ở Ridge. Báo cáo ghi cả hai giá trị vì chúng phục vụ hai việc khác
+nhau. Thuật toán chỉ dùng được $\lambda$, do gradient tăng tốc đọc $\mu$ để dựng
+hệ số quán tính mà $\mu$ tại $\wstar$ thì chỉ biết sau khi đã có $\wstar$. Tốc độ
+quan sát được, ngược lại, bám theo $271{,}2$, nên mọi so sánh với cận lý thuyết
+tính từ $\kappa = 288{,}3$ sẽ thấy thực nghiệm nhanh hơn cận. Nhận xét đó chỉ đúng
+quanh $\wstar$; nếu dãy lặp đi qua một vùng có nhiều dòng nằm ngoài hơn thì $\mu$
+cục bộ ở đó còn thấp hơn giá trị đo tại $\wstar$.
+
+Hàm \eqref{eq:huber} không có nghiệm đóng, nên $\fstar = 5{,}196306$ phải giải
+bằng số: một lần chạy Newton riêng, độc lập với mọi lần chạy được đo, dừng sau 8
+vòng lặp với $\norm{\nabla f_{H}(\wstar)} = 2{,}6 \cdot 10^{-16}$. Mất mát lớn hơn
+nằm ở cách đo sai số. Đẳng thức \eqref{eq:gap} dựa vào việc khai triển Taylor của
+hàm bậc hai không còn số hạng dư, mà \eqref{eq:huber} không có đẳng thức nào
+tương ứng, nên gap chỉ còn tính được bằng phép trừ, với phép trừ dồn xuống từng
+dòng thay vì làm một lần ở cuối. Đo trên chính bài toán này, cách dồn xuống từng
+dòng hạ sàn từ $8{,}9 \cdot 10^{-16}$ xuống $1{,}1 \cdot 10^{-16}$, tức khoảng
+$7{,}75$ lần, và đổi cửa sổ lấy trung vị thì tỷ lệ nằm trong khoảng $7{,}75$ tới
+$8{,}5$ lần. Mức cải thiện đó chưa tới một bậc độ lớn, thấp xa mức tám bậc mà
+\eqref{eq:gap} cho trên bài toán Ridge, nên mọi hình trong chương này có sàn cao
+hơn hẳn các hình trước đó.
+
+Cách dồn theo dòng hạ được sàn nhưng không giữ được dấu. Đo dọc một hướng ngẫu
+nhiên cố định, nó trả về $-1{,}3 \cdot 10^{-16}$ ở khoảng cách $10^{-8}$ tới
+$\wstar$ và $-1{,}2 \cdot 10^{-17}$ ở khoảng cách $10^{-13}$, tức đổi dấu ngay từ
+điểm đầu tiên tách khỏi giá trị thật. Một giá trị âm không có chỗ trên trục
+logarit, nên điểm đó không mờ dần xuống đáy mà biến mất khỏi trục và bị kẹp về đáy
+khung hình. Các hình của chương này giữ nguyên phần đuôi thay vì cắt bớt, nên dải
+răng cưa dưới khoảng $10^{-15}$ phải đọc là sàn của phép đo, không phải dao động
+của thuật toán.
+
+\section{Newton mất đặc quyền một vòng}
+
+Newton cần 7 vòng lặp để đạt ngưỡng $10^{-6}$ và 8 vòng để chạm sàn số, thay vì
+đúng một vòng như trên Ridge. Bốn vòng đầu chỉ đưa sai số từ $3{,}85$ xuống
+$0{,}19$, còn từ vòng thứ năm trở đi thì số mũ gần như nhân đôi mỗi vòng,
+$1{,}10 \cdot 10^{-2}$ rồi $1{,}98 \cdot 10^{-5}$, $6{,}65 \cdot 10^{-11}$ và
+$1{,}66 \cdot 10^{-17}$, đúng dạng hội tụ bậc hai \cite{nocedal2006numerical}
+(cột thứ hai của bảng~\ref{tab:huber-newton}). Hessian của \eqref{eq:huber} đổi
+theo $w$ vì tập dòng nằm trong vùng bậc hai đổi theo $w$, nên xa $\wstar$ thì xấp
+xỉ bậc hai còn số hạng dư đáng kể và bước Newton chỉ là một bước giảm bình thường;
+gần $\wstar$ thì tập đó ổn định lại, số hạng dư teo theo bình phương sai số, và
+tốc độ bậc hai xuất hiện.
+
+\begin{table}[tbp]
+  \centering
+  \caption{Sai số $f_{H}(w_k) - \fstar$ từng vòng của ba biến thể Newton, cùng
+    điểm khởi tạo $w_{0} = 0$ và cùng ngân sách 60 vòng. Cột Newton dừng ở vòng 8
+    vì đã chạm sàn số. Hai cột sau dùng lại phân rã Cholesky của $w_{0}$, tức
+    phương pháp dây cung.}
+  \label{tab:huber-newton}
+  \begin{tabular}{rlll}
+    \toprule
+    Vòng & Newton, $t = 1$ & Dây cung, $t = 1$ & Dây cung, Armijo \\
+    \midrule
+    0  & $3{,}8475$              & $3{,}8475$ & $3{,}8475$ \\
+    1  & $2{,}8374$              & $2{,}8374$ & $2{,}8374$ \\
+    2  & $1{,}1954$              & $2{,}3728$ & $2{,}3728$ \\
+    3  & $0{,}6174$              & $2{,}6264$ & $1{,}66 \cdot 10^{-2}$ \\
+    4  & $0{,}1928$              & $2{,}3135$ & $1{,}60 \cdot 10^{-3}$ \\
+    5  & $1{,}10 \cdot 10^{-2}$  & $2{,}6086$ & $1{,}60 \cdot 10^{-3}$ \\
+    6  & $1{,}98 \cdot 10^{-5}$  & $2{,}3070$ & $2{,}12 \cdot 10^{-4}$ \\
+    7  & $6{,}65 \cdot 10^{-11}$ & $2{,}6073$ & $7{,}67 \cdot 10^{-5}$ \\
+    8  & $1{,}66 \cdot 10^{-17}$ & $2{,}3064$ & $3{,}83 \cdot 10^{-5}$ \\
+    \midrule
+    13 &                         & $2{,}6076$ & $5{,}32 \cdot 10^{-7}$ \\
+    60 &                         & $2{,}3064$ & $1{,}15 \cdot 10^{-16}$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Dùng lại phân rã Cholesky của điểm khởi tạo, thứ đã cho Newton kết quả tốt nhất
+trên Ridge, thì với bước đầy đủ dãy lặp không hội tụ. Sai số khóa vào một chu
+trình hai điểm, luân phiên giữa $2{,}3064$ và $2{,}6076$, và chạy hết ngân sách 60
+vòng vẫn không thoát ra; hình~\ref{fig:huber-newton} vẽ nó thành một đường nằm
+ngang. Ma trận đóng băng tại $w_{0} = 0$ mang độ cong tại điểm xuất phát chứ không
+phải tại điểm hiện tại, nên bước đầy đủ theo hướng đó vượt qua cực tiểu và rơi
+sang phía đối diện với sai số gần bằng sai số cũ, rồi vòng sau lại vượt ngược về.
+Tên đúng của biến thể này là phương pháp dây cung, và trên Ridge thì hai tên gọi
+trùng nhau, vì Hessian là hằng số nên ma trận đóng băng bằng đúng ma trận thật và
+bảng~\ref{tab:headline} ghi nó hội tụ trong một vòng.
+
+Thêm backtracking vào đúng hướng đó thì nó hội tụ, đạt $10^{-6}$ ở vòng 13 và
+xuống $1{,}15 \cdot 10^{-16}$ ở cuối ngân sách. Hướng dây cung luôn là hướng giảm,
+vì ma trận đóng băng xác định dương nên
+$\nabla f_{H}\trans p = -\nabla f_{H}\trans H(w_{0})^{-1} \nabla f_{H} < 0$, và độ
+dài bước mới là chỗ hỏng; line search cắt bước xuống dưới ngưỡng vượt và trả lại
+tốc độ tuyến tính mà phương pháp dây cung có damping phải có. Từ vòng 6 trở đi,
+cột cuối của bảng~\ref{tab:huber-newton} cho thấy sai số giảm còn khoảng $0{,}4$
+tới $0{,}5$ lần mỗi vòng, một hệ số gần như cố định, khác hẳn cột Newton bên cạnh.
+Trên hàm mục tiêu này, line search không phải một cải tiến của phương pháp dây
+cung mà là điều kiện để nó chạy được.
+
+\resultpair{huber-newton}{Newton trên hàm mục tiêu Huber, với bước đầy đủ và với
+  backtracking, mỗi biến thể một lần dựng lại Hessian và một lần dùng lại nhân tử
+  của điểm khởi tạo.}{fig:huber-newton}
+
+Dựng lại Hessian mỗi vòng, thứ mà biến thể đóng băng muốn tránh, tốn $26{,}3$ ms ở
+quy mô $n = \num{200000}$, so với $20{,}8$ ms của Hessian Ridge trên cùng dữ liệu.
+Chênh lệch chỉ khoảng một phần tư vì chỉ các dòng nằm trong vùng bậc hai đi vào
+tích $X_{S}\trans X_{S}$, và số dòng đó nhỏ hơn $n$; cách cài đặt còn lại, giữ đủ
+$n$ dòng rồi nhân trọng số $1$ hoặc $0$, đo được $64{,}1$ ms, chậm hơn $2{,}44$
+lần. Với giá đó thì đóng băng Hessian không đáng, vì nó tiết kiệm 7 lần dựng ma
+trận, mỗi lần $26{,}3$ ms, để đổi lấy 6 vòng lặp thừa và một line search bắt buộc.
+Cân nhắc này đảo chiều khi $d$ lớn, do chi phí dựng Hessian tăng theo $d^{2}$ còn
+phần tiết kiệm chỉ tăng tuyến tính theo số vòng.
+
+\section{Backtracking có việc với hướng nào}
+
+Với hướng gradient, backtracking lùi bước thật, tốn trung bình $4{,}20$ lần đánh
+giá hàm mục tiêu mỗi vòng lặp. Con số đó gần như không đổi so với Ridge, nơi cùng
+cấu hình $c = 0{,}3$, $\rho = 0{,}5$, $t_{0} = 1$ tốn $4{,}94$ lần
+(bảng~\ref{tab:armijo}), nên phần này của kết quả không nói gì về hình dạng hàm
+mục tiêu. Line search đã có việc từ trước, vì hướng gradient không mang thông tin
+độ cong ở cả hai bài toán và $t_{0} = 1$ vì thế luôn nằm xa trên bước mà điều kiện
+Armijo chấp nhận.
+
+Trung bình $4{,}20$ không mô tả đúng phần thân lần chạy. Hình~\ref{fig:huber-cost}
+cho thấy mức ổn định là 3 lần mỗi vòng và mức đó giữ tới vòng 943, sau đó đường
+cong vọt lên và đạt đỉnh 36 lần ở vòng 1033. Ở phần đuôi, mức giảm thật của hàm
+mục tiêu đã nhỏ hơn nhiễu làm tròn của $f_{H}$ nên mọi bước thử đều trượt điều
+kiện giảm đủ và line search phải chia đôi hàng chục lần mới tìm được một bước lọt
+qua, đúng hiện tượng mà chương~\ref{ch:step} mô tả bằng hình~\ref{fig:armijocost}.
+Phần đuôi đó cũng là lý do lần chạy kết thúc ở trạng thái đình trệ chứ không phải
+hội tụ.
+
+\resultfig{huber-step_cost}{Số lần đánh giá hàm mục tiêu mỗi vòng lặp mà điều kiện
+  Armijo đòi, trên hướng gradient so với trên hướng Newton.}{fig:huber-cost}
+
+Với hướng Newton, backtracking không lùi bước một lần nào, đo được đúng $1{,}00$
+lần đánh giá hàm mỗi vòng ở mọi vòng của lần chạy, tức line search nhận ngay bước
+đầy đủ ở lần thử thứ nhất. Dự đoán ban đầu của nhóm là ngược lại, rằng bỏ tính bậc hai sẽ làm
+backtracking có việc với cả hai hướng, và dự đoán đó sai vì nó lẫn hai chuyện. Hàm
+mục tiêu hết bậc hai thì bước Newton hết trúng nghiệm, nhưng nó vẫn là bước cực
+tiểu hóa xấp xỉ bậc hai tại chỗ, nên mức giảm mà nó hứa đã tính theo độ cong và
+điều kiện giảm đủ thỏa ngay.
+
+Phép đối chứng sạch cho khẳng định trên nằm ở cặp Newton và dây cung, vì hai biến
+thể đó chia nhau đúng một cấu hình line search với $c = 10^{-4}$: hướng Newton tốn
+$1{,}00$ lần mỗi vòng còn hướng dây cung tốn $1{,}53$ lần, tức bị từ chối ở khoảng
+một nửa số vòng, do ma trận đóng băng chỉ mang độ cong tại điểm xuất phát. Phép so
+$4{,}20$ với $1{,}00$ thì không sạch bằng, vì nhóm gradient đo với $c = 0{,}3$ tức
+một điều kiện giảm đủ chặt hơn ba nghìn lần, nên nó có phần lợi cho Newton và chỉ
+nên đọc như một mốc độ lớn.
+
+Đổi số vòng lấy giá mỗi vòng vẫn có lời trên hàm mục tiêu này, nhưng phần lời thu
+hẹp. Gradient descent với backtracking đạt $10^{-6}$ ở vòng 220 so với 381 vòng
+của bước cố định $1{,}9/L$, và tính theo thời gian thì $4{,}83$ giây so với
+$5{,}44$ giây, tức nhanh hơn 13 phần trăm. Trên Ridge, chương~\ref{ch:step} đo
+được 143 vòng và $3{,}14$ giây so với 331 vòng và $4{,}75$ giây, tức nhanh hơn một
+nửa. Mỗi lần đánh giá hàm phải nhân $X w$, cùng bậc $\bigO(nd)$ với một lần tính
+gradient, nên ba lần thử mỗi vòng xóa gần hết lợi thế $1{,}7$ lần về số vòng lặp.
+
+\section{Thứ hạng bốn thuật toán trên hàm phi tuyến}
+
+Thứ hạng bốn thuật toán trên hàm mục tiêu Huber giống thứ hạng trên Ridge, và
+giống nhau trên cả hai trục đo: Newton 7 vòng và $0{,}34$ giây, gradient tăng tốc
+83 vòng và $1{,}19$ giây, gradient descent với backtracking 220 vòng và $4{,}83$
+giây, rồi bước cố định 381 vòng và $5{,}44$ giây (bảng~\ref{tab:huber-headline}).
+Giá mỗi vòng của bốn phương pháp chênh nhau ít hơn nhiều so với số vòng, nên trục
+thời gian không đủ sức đảo trật tự mà trục vòng lặp đã đặt ra. Cơ chế này giống
+hệt cơ chế mà chương~\ref{ch:headline} nêu cho bài toán Ridge, và nó đảo chiều ở
+cùng một điều kiện, khi $d$ lớn tới mức chi phí $\bigO(nd^{2})$ của Hessian chi
+phối.
+
+\begin{table}[tbp]
+  \centering
+  \caption{Bốn thuật toán trên hàm mục tiêu Huber, mỗi cấu hình giữ nguyên như đã
+    chọn cho bài toán Ridge, đặt cạnh cột Ridge lấy từ bảng~\ref{tab:headline}.
+    Hai cột đầu đo tới ngưỡng $10^{-6}$, các cột sau là toàn bộ lần chạy. Dòng
+    Newton của cột Ridge là biến thể dùng lại Hessian, vốn trùng với Newton trên
+    hàm bậc hai; trên Huber biến thể đó là phương pháp dây cung nên chỗ này dùng
+    Newton dựng lại Hessian mỗi vòng. SGD không đạt $10^{-6}$ và dừng ở
+    $3{,}1 \cdot 10^{-4}$.}
+  \label{tab:huber-headline}
+  \begin{tabular}{lrrrrrr}
+    \toprule
+    & \multicolumn{4}{c}{Huber} & \multicolumn{2}{c}{Ridge} \\
+    \cmidrule(lr){2-5}\cmidrule(lr){6-7}
+    & \multicolumn{2}{c}{Tới $10^{-6}$} & \multicolumn{2}{c}{Chạy hết} & \multicolumn{2}{c}{Chạy hết} \\
+    \cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}
+    Cấu hình & Vòng & Giây & Vòng & Giây & Vòng & Giây \\
+    \midrule
+    Newton, $t = 1$                & 7   & 0{,}34 & 8    & 0{,}38  & 1    & 0{,}03  \\
+    AGD, $\beta$ theo $t$ và $\mu$ & 83  & 1{,}19 & 301  & 4{,}29  & 286  & 3{,}92  \\
+    GD, backtracking               & 220 & 4{,}83 & 1051 & 27{,}21 & 561  & 13{,}86 \\
+    GD, $t = 1{,}9/L$              & 381 & 5{,}44 & 2108 & 30{,}64 & 2022 & 27{,}52 \\
+    SGD, $B = 2048$                & \multicolumn{1}{c}{--} & \multicolumn{1}{c}{--} & 3880 & 2{,}27 & 3880 & 2{,}02 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Ba phương pháp bậc một gần như không nhận ra hàm mục tiêu đã đổi. Gradient descent
+với bước cố định chạy 2108 vòng trong $30{,}6$ giây trên Huber so với 2022 vòng và
+$27{,}5$ giây trên Ridge, còn gradient tăng tốc chạy 301 vòng và $4{,}29$ giây so
+với 286 vòng và $3{,}92$ giây. Số vòng lặp của phương pháp bậc một chỉ phụ thuộc
+$\kappa$, mà $\kappa$ thật chỉ đi từ $267{,}5$ lên $271{,}2$, tức $1{,}4$ phần
+trăm. Newton là phương pháp duy nhất mất mát thật sự, vì tính bậc hai chính là thứ
+đã cho nó một vòng lặp, và khoảng cách về số vòng giữa nó với gradient descent thu
+hẹp từ 2022 lần xuống 264 lần. Hai dòng backtracking không đọc theo cách này được,
+do cả hai dừng ở trạng thái đình trệ nên 1051 vòng và 561 vòng đo vị trí sàn số
+của từng bài toán chứ không đo độ khó của chúng.
+
+SGD giữ nguyên vai trò của nó và vẫn phải đọc riêng. Nó chạy 3880 vòng lô trong
+$2{,}27$ giây, nhanh nhất trên mỗi đơn vị thời gian, nhưng dừng ở sai số
+$3{,}1 \cdot 10^{-4}$ và không bao giờ tới $10^{-6}$, gần đúng mức
+$6{,}0 \cdot 10^{-4}$ mà chương~\ref{ch:sgd} đo trên Ridge. Sàn đó do phương sai
+gradient lô quyết định chứ không do độ cong của hàm mục tiêu, nên đổi mất mát bình
+phương sang mất mát Huber không dịch nó đi đáng kể. Ở ngưỡng $10^{-3}$ thì SGD vẫn
+thắng cả bốn phương pháp còn lại; ở ngưỡng chặt hơn thì nó không bao giờ về đích.
+
+\resultpair{huber-headline}{Bốn thuật toán trên hàm mục tiêu Huber, mỗi thuật toán
+  giữ nguyên cấu hình đã chọn cho bài toán Ridge ở chương~\ref{ch:headline}.}{fig:huber-headline}
+
+Phần đuôi của hình~\ref{fig:huber-headline} phải đọc theo sàn số đã nêu ở
+mục~\ref{sec:huber-loss}. Dưới khoảng $10^{-15}$, đường gradient descent và đường
+gradient tăng tốc chuyển thành một dải răng cưa biên độ cỡ $10^{-16}$, còn đường
+dây cung có damping trong hình~\ref{fig:huber-newton} rơi thẳng xuống đáy khung ở
+vòng 52 và vòng 55. Ở cả hai chỗ đó, sai số đo được đã xuống dưới sàn của phép
+trừ, và những điểm mà công thức trả về giá trị âm thì bị kẹp lên đáy trục logarit.
+Đường Newton dừng ở $1{,}66 \cdot 10^{-17}$ sau 8 vòng cũng vì chạm sàn đó chứ
+không vì thuật toán hết khả năng giảm tiếp. Các hình giữ nguyên phần đuôi thay vì
+cắt bớt, nên người đọc thấy đúng chỗ mà phép đo hết tác dụng.
 
 % ===========================================================================
 \chapter{So sánh tổng hợp trên hai trục}\label{ch:headline}

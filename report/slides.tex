@@ -345,6 +345,41 @@
   \note{Đảo chiều khi d lên vài nghìn: Hessian tăng theo d^2, gradient theo d.}
 \end{frame}
 
+\begin{frame}{Bỏ tính bậc hai: Newton cần bảy vòng thay vì một}
+  \[
+    f_{H}(w) = \frac{1}{n}\sum_{i} H_{\delta}(x_i\trans w - y_i)
+      + \frac{\lambda}{2}\norm{w}^{2}, \qquad \delta = 4{,}07
+  \]
+  \begin{center}\small
+    \begin{tabular}{rll}
+      \toprule
+      Vòng & $f - \fstar$, Newton & $f - \fstar$, Hessian dùng lại \\
+      \midrule
+      5 & $1{,}10 \cdot 10^{-2}$  & $2{,}61$ \\
+      6 & $1{,}98 \cdot 10^{-5}$  & $2{,}31$ \\
+      7 & $6{,}66 \cdot 10^{-11}$ & $2{,}61$ \\
+      \bottomrule
+    \end{tabular}
+  \end{center}
+  \chotlai{Số mũ nhân đôi mỗi vòng, đúng dạng hội tụ bậc hai. Dùng lại Hessian
+    với bước đầy đủ thì dãy khóa vào chu trình hai điểm và không hội tụ; thêm
+    backtracking thì hội tụ ở vòng 13.}
+  \note{19,6 phần trăm số dòng nằm ngoài vùng bậc hai, nên hàm thật sự không còn
+    là hàm bậc hai. L giữ nguyên 9,1156, mu tụt xuống sàn lam nên kappa lên
+    288,3; đo tại w* thì kappa thật là 271,2.}
+\end{frame}
+
+\begin{frame}{Backtracking có việc với gradient, không có việc với Newton}
+  \centering
+  \resultgraphic[0.70]{huber-step_cost}
+  \chotlai{GD tốn $4{,}20$ lần đánh giá hàm mỗi vòng, Newton tốn đúng một lần và
+    nhận ngay bước đầy đủ ở mọi vòng.}
+  \note{Ngược với dự đoán ban đầu. Hướng Newton đã mang sẵn thông tin độ cong nên
+    bước đầy đủ thỏa điều kiện giảm đủ ngay. Đối chứng cùng c = 1e-4: hướng dây
+    cung tốn 1,53 lần mỗi vòng. GD đo với c = 0,3 nên phép so 4,20 với 1,00 chỉ
+    là mốc độ lớn.}
+\end{frame}
+
 % ======================= PHẦN 5. SO SÁNH TỔNG HỢP =======================
 
 \begin{frame}{So sánh tổng hợp: theo số vòng lặp}
