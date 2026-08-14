@@ -111,8 +111,14 @@ liệu tham khảo.
 
 ## Sản phẩm biên dịch
 
-Không đưa file do trình biên dịch sinh ra vào git. Danh sách đầy đủ nằm trong
-`.gitignore`, gồm `.pdf` và các file trung gian `.aux`, `.log`, `.out`, `.nav`,
-`.snm`, `.toc`, `.bbl`, `.bcf`, `.blg`, `.fls`, `.fdb_latexmk`, `.run.xml`,
-`.synctex.gz`, `.vrb`, `.xdv`. Khi thêm gói LaTeX sinh ra đuôi file khác, cập nhật
-`.gitignore` ngay trong lần commit đó.
+`report.pdf` và `slides.pdf` nằm trong git, vì bài nộp chính là hai file đó và
+người chấm cần mở được chúng mà không phải cài TeX Live. Các file trung gian thì
+không: `.gitignore` loại `.aux`, `.log`, `.out`, `.nav`, `.snm`, `.toc`, `.bbl`,
+`.bcf`, `.blg`, `.fls`, `.fdb_latexmk`, `.run.xml`, `.synctex.gz`, `.vrb`, `.xdv`.
+Khi thêm gói LaTeX sinh ra đuôi file khác, cập nhật `.gitignore` ngay trong lần
+commit đó.
+
+Cái giá của việc track hai file PDF là chúng có thể cũ hơn phần `.tex` sinh ra
+chúng, vì git không biết file nào dẫn xuất từ file nào. Sửa nguồn xong thì biên
+dịch lại và commit bản PDF mới trong cùng lần commit, nếu không kho sẽ mang một
+bản nộp không khớp với nguồn của nó.

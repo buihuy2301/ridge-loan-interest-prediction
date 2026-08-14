@@ -68,7 +68,7 @@ Chi tiết ở `docs/quy-uoc-bao-cao.md`. Các điểm bắt buộc:
 - Biên dịch bằng `latexmk -xelatex`, vì cần font Unicode đầy đủ dấu tiếng Việt.
 - Mọi hình và bảng phải có `\caption`, có `\label` và được `\ref` ít nhất một lần. Mọi phát biểu lấy từ tài liệu phải có `\cite`; mục nào trong `refs.bib` không được trích dẫn thì xóa.
 - Chạy `pytest tests/test_report.py` trước mỗi lần nộp.
-- Không đưa sản phẩm biên dịch vào git. Thêm gói LaTeX sinh ra đuôi file mới thì cập nhật `.gitignore` ngay trong lần commit đó.
+- `report/report.pdf` và `report/slides.pdf` nằm trong git, vì bài nộp là hai file đó. Mọi file trung gian khác thì không; thêm gói LaTeX sinh ra đuôi file mới thì cập nhật `.gitignore` ngay trong lần commit đó.
 
 ## 6. Tổ chức mã nguồn
 
