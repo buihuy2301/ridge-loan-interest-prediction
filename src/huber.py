@@ -334,6 +334,14 @@ def choose_delta(ridge: RidgeObjective, factor: float = 1.345) -> float:
     return factor * spread / 0.6745
 
 
+# A genuine Newton solve reaches a gradient norm around 1e-14 (`solve_reference`
+# runs to `tol=1e-14`). A stored reference built from different data of the same
+# shape measured 0.349 at the stored w_star in the review that added this check.
+# 1e-8 sits many orders of magnitude from both, so it does not need tuning per
+# dataset.
+_REFERENCE_GRADIENT_TOLERANCE = 1e-8
+
+
 def build_huber(
     X: np.ndarray,
     y: np.ndarray,
@@ -348,9 +356,19 @@ def build_huber(
     practice, since the inputs are frozen too, but writing it down makes the
     requirement checkable and saves the Newton solve on every rerun.
 
-    A stored file describing a different problem is ignored rather than trusted:
-    silently reusing the wrong w* would put every curve in the chapter on the
-    wrong axis.
+    A stored reference is trusted only after it is checked against the data it is
+    about to stand in for, not merely matched on shape. `n`, `d`, and `lam` are a
+    cheap precondition, rejected before any matrix product is attempted so a
+    shape mismatch is reported instead of raised from inside numpy; but two
+    datasets can share `n`, `d`, and `lam` while differing in every entry (three
+    scaling variants of one design matrix, for instance), and `delta` is derived
+    from the data rather than passed in, so shape agreement alone says nothing
+    about whether the stored `w_star` solves *this* problem. The property that
+    actually matters — is the stored `w_star` a stationary point of the objective
+    built from the data just handed in — is checked directly with one gradient
+    evaluation. A stored file that fails either check is ignored rather than
+    trusted: silently reusing the wrong w* would put every curve in the chapter
+    on the wrong axis.
     """
     path = Path(path)
     log = print if verbose else (lambda *a, **k: None)
@@ -358,18 +376,25 @@ def build_huber(
 
     if path.exists():
         stored = json.loads(path.read_text())
-        matches = (
+        shape_matches = (
             stored["n"] == n
             and stored["d"] == d
             and np.isclose(stored["lam"], lam, rtol=1e-12)
         )
-        if matches:
-            log(f"huber: reference read from {path}")
-            objective = HuberObjective(X, y, lam, stored["delta"], w_star=stored["w_star"])
-            objective.reference_grad_norm = stored["grad_norm"]
-            objective.reference_iters = stored["iters"]
-            return objective
-        log(f"huber: {path} describes a different problem, solving again")
+        if shape_matches:
+            candidate = HuberObjective(X, y, lam, stored["delta"], w_star=stored["w_star"])
+            grad_norm_at_stored = float(np.linalg.norm(candidate.gradient(candidate.w_star)))
+            if grad_norm_at_stored <= _REFERENCE_GRADIENT_TOLERANCE:
+                log(f"huber: reference read from {path}")
+                candidate.reference_grad_norm = stored["grad_norm"]
+                candidate.reference_iters = stored["iters"]
+                return candidate
+            log(
+                f"huber: {path} does not solve this problem "
+                f"(gradient norm {grad_norm_at_stored:.3e} at the stored w_star), solving again"
+            )
+        else:
+            log(f"huber: {path} describes a different problem, solving again")
 
     objective = HuberObjective(X, y, lam, choose_delta(RidgeObjective(X, y, lam)))
     w_star, grad_norm, iters = solve_reference(objective)

@@ -223,6 +223,45 @@ def test_build_huber_solves_again_when_the_stored_problem_differs(data, tmp_path
     assert np.linalg.norm(other.gradient(other.w_star)) <= 1e-13
 
 
+def test_build_huber_solves_again_when_the_stored_data_differs_at_fixed_shape(data, tmp_path):
+    """Same n, d, lam is not enough to trust a stored reference.
+
+    `build_scaling_variants` in src/dataset.py produces exactly this shape
+    collision from real data: raw, centred, and standardised design matrices
+    share n, d, and are run at the same lam, but their rows are different
+    numbers. A stored reference built from one and reused for another is a
+    wrong-w* bug that the n/d/lam comparison alone cannot see, because delta
+    and w_star are both derived from the data, not passed in alongside it.
+    """
+    import json as json_module
+
+    from src.huber import build_huber
+
+    X, y = data
+    path = tmp_path / "huber_reference.json"
+    first = build_huber(X, y, lam=LAM, path=path, verbose=False)
+
+    # Same n, d, lam as `data`, but a different draw with a much larger noise
+    # scale, so its residual spread -- and therefore its delta -- differs
+    # measurably from the first dataset's.
+    rng = np.random.default_rng(99)
+    n, d = X.shape
+    X_other = rng.standard_normal((n, d))
+    X_other = (X_other - X_other.mean(0)) / X_other.std(0)
+    y_other = X_other @ rng.standard_normal(d) + 3.0 * rng.standard_normal(n)
+    y_other = y_other - y_other.mean()
+
+    other = build_huber(X_other, y_other, lam=LAM, path=path, verbose=False)
+
+    # The returned objective must genuinely solve the second problem, not
+    # silently carry over the first dataset's w_star.
+    assert np.linalg.norm(other.gradient(other.w_star)) <= 1e-13
+    assert other.delta != pytest.approx(first.delta, rel=1e-2)
+
+    stored = json_module.loads(path.read_text())
+    assert stored["delta"] == pytest.approx(other.delta)
+
+
 def test_both_objectives_satisfy_the_shared_protocol(
     data: tuple[np.ndarray, np.ndarray], objective: HuberObjective
 ):
