@@ -357,7 +357,7 @@
       \midrule
       5 & $1{,}10 \cdot 10^{-2}$  & $2{,}61$ \\
       6 & $1{,}98 \cdot 10^{-5}$  & $2{,}31$ \\
-      7 & $6{,}66 \cdot 10^{-11}$ & $2{,}61$ \\
+      7 & $6{,}65 \cdot 10^{-11}$ & $2{,}61$ \\
       \bottomrule
     \end{tabular}
   \end{center}
@@ -506,6 +506,10 @@
     \item \textbf{Ba chỗ lệch khỏi lý thuyết}, cùng một lý do: cận lý thuyết là
       cận cho trường hợp xấu nhất, thực nghiệm chạy trên một bài toán, một điểm
       khởi tạo và một ngân sách cụ thể.
+    \item \textbf{Hàm mục tiêu thứ hai.} Trên mất mát Huber, dùng lại Hessian hết
+      miễn phí ngay khi hàm hết bậc hai: bước đầy đủ không hội tụ, phải có line
+      search mới về đích sau 13 vòng. Backtracking lùi bước với hướng gradient
+      nhưng không lùi lần nào với hướng Newton.
     \item \textbf{Phạm vi.} Với $d = 116$ và $n$ cỡ triệu, phương pháp bậc hai
       thắng áp đảo. Phương pháp lặp bậc một chỉ có lợi khi $d$ lớn tới mức không
       dựng nổi $X\trans X$.

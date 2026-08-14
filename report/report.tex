@@ -70,7 +70,7 @@
 
 Báo cáo so sánh bốn thuật toán tối ưu hóa tự cài đặt, gradient descent đầy đủ,
 mini-batch SGD, gradient tăng tốc Nesterov và phương pháp Newton, mỗi thuật toán
-với cả bước cố định lẫn backtracking, trên cùng một hàm mất mát Ridge dựng từ
+với cả bước cố định lẫn backtracking, trước hết trên hàm mất mát Ridge dựng từ
 \num{1200000} khoản vay Lending Club với $d = 116$ thuộc tính. Hàm mục tiêu lồi
 mạnh và có nghiệm đóng \cite{boyd2004convex}, nên giá trị tối ưu $\fstar$ tính được tới sai số máy và
 mọi biểu đồ hội tụ vẽ sai số $f(w_k) - \fstar$ trên thang logarit.
@@ -82,12 +82,20 @@ tốt nhất cần 331 vòng và $4{,}75$ giây. SGD nhanh nhất trên mỗi đ
 nhưng dừng ở sai số $6{,}0 \cdot 10^{-4}$ vì bước hằng chỉ đưa dãy lặp vào một
 lân cận của nghiệm.
 
-Ba quan sát đi ngược dự đoán ban đầu và được giải thích trong báo cáo: bước
+Vì hàm bậc hai cho Newton nghiệm sau một vòng lặp và cho backtracking không việc
+gì để làm, chương~\ref{ch:huber} chạy lại cả bốn thuật toán trên một hàm mục tiêu
+thứ hai dựng từ đúng bộ dữ liệu đó, mất mát Huber với cùng số hạng hiệu chỉnh.
+Newton ở đó cần 7 vòng lặp, và biến thể dùng lại Hessian, vốn tốt nhất trên Ridge,
+không còn hội tụ nếu thiếu line search.
+
+Năm quan sát đi ngược dự đoán ban đầu và được giải thích trong báo cáo: bước
 $1{,}9/L$ nhanh gấp hơn hai lần bước tối ưu $2/(L+\mu)$ của lý thuyết, do sai số
 ban đầu dồn vào các hướng trị riêng lớn; backtracking thắng bước cố định trên cả
-hai trục đo chứ không chỉ trên trục vòng lặp; và tốc độ giảm của bước SGD quyết
-định kết luận về quy tắc chọn bước, tới mức hai giá trị hợp lý cho hai kết luận
-ngược nhau.
+hai trục đo chứ không chỉ trên trục vòng lặp; tốc độ giảm của bước SGD quyết định
+kết luận về quy tắc chọn bước, tới mức hai giá trị hợp lý cho hai kết luận ngược
+nhau; trên mất mát Huber, dùng lại Hessian với bước đầy đủ khóa dãy lặp vào một
+chu trình hai điểm thay vì chỉ làm chậm nó; và cũng trên hàm đó, backtracking lùi
+bước với hướng gradient nhưng không lùi lần nào với hướng Newton.
 
 \tableofcontents
 
@@ -836,14 +844,17 @@ tương ứng, nên gap chỉ còn tính được bằng phép trừ, với phé
 dòng thay vì làm một lần ở cuối. Đo trên chính bài toán này, cách dồn xuống từng
 dòng hạ sàn từ $8{,}9 \cdot 10^{-16}$ xuống $1{,}1 \cdot 10^{-16}$, tức khoảng
 $7{,}75$ lần, và đổi cửa sổ lấy trung vị thì tỷ lệ nằm trong khoảng $7{,}75$ tới
-$8{,}5$ lần. Mức cải thiện đó chưa tới một bậc độ lớn, thấp xa mức tám bậc mà
-\eqref{eq:gap} cho trên bài toán Ridge, nên mọi hình trong chương này có sàn cao
-hơn hẳn các hình trước đó.
+$8{,}5$ lần. Mức cải thiện đó chưa tới một bậc độ lớn, trong khi \eqref{eq:gap}
+giành thêm hơn tám bậc trên bài toán thử $n = 400$, $d = 12$ của mục 1.3. Hai con
+số đo trên hai bài toán khác nhau nên không so trực tiếp được, nhưng khoảng cách
+giữa chúng đủ lớn để giải thích vì sao mọi hình trong chương này có sàn cao hơn
+hẳn các hình trước đó.
 
 Cách dồn theo dòng hạ được sàn nhưng không giữ được dấu. Đo dọc một hướng ngẫu
-nhiên cố định, nó trả về $-1{,}3 \cdot 10^{-16}$ ở khoảng cách $10^{-8}$ tới
-$\wstar$ và $-1{,}2 \cdot 10^{-17}$ ở khoảng cách $10^{-13}$, tức đổi dấu ngay từ
-điểm đầu tiên tách khỏi giá trị thật. Một giá trị âm không có chỗ trên trục
+nhiên cố định, nó bắt đầu tách khỏi giá trị thật ở khoảng cách $10^{-7}$ tới
+$\wstar$ mà vẫn còn dương, rồi đổi dấu ngay ở khoảng cách kế tiếp: $-1{,}3 \cdot
+10^{-16}$ ở $10^{-8}$, và $-1{,}2 \cdot 10^{-17}$ ở $10^{-13}$. Một giá trị âm
+không có chỗ trên trục
 logarit, nên điểm đó không mờ dần xuống đáy mà biến mất khỏi trục và bị kẹp về đáy
 khung hình. Các hình của chương này giữ nguyên phần đuôi thay vì cắt bớt, nên dải
 răng cưa dưới khoảng $10^{-15}$ phải đọc là sàn của phép đo, không phải dao động
@@ -913,7 +924,10 @@ cung mà là điều kiện để nó chạy được.
 
 \resultpair{huber-newton}{Newton trên hàm mục tiêu Huber, với bước đầy đủ và với
   backtracking, mỗi biến thể một lần dựng lại Hessian và một lần dùng lại nhân tử
-  của điểm khởi tạo.}{fig:huber-newton}
+  của điểm khởi tạo. Hình chỉ thấy ba đường vì hai biến thể dựng lại Hessian mỗi
+  vòng, một với bước đầy đủ và một với backtracking, cho cùng một dãy sai số nên
+  vẽ chồng khít lên nhau; backtracking nhận bước đầy đủ ở mọi vòng nên không có gì
+  tách chúng ra.}{fig:huber-newton}
 
 Dựng lại Hessian mỗi vòng, thứ mà biến thể đóng băng muốn tránh, tốn $26{,}3$ ms ở
 quy mô $n = \num{200000}$, so với $20{,}8$ ms của Hessian Ridge trên cùng dữ liệu.
@@ -935,17 +949,23 @@ mục tiêu. Line search đã có việc từ trước, vì hướng gradient kh
 độ cong ở cả hai bài toán và $t_{0} = 1$ vì thế luôn nằm xa trên bước mà điều kiện
 Armijo chấp nhận.
 
-Trung bình $4{,}20$ không mô tả đúng phần thân lần chạy. Hình~\ref{fig:huber-cost}
-cho thấy mức ổn định là 3 lần mỗi vòng và mức đó giữ tới vòng 943, sau đó đường
-cong vọt lên và đạt đỉnh 36 lần ở vòng 1033. Ở phần đuôi, mức giảm thật của hàm
+Trung bình $4{,}20$ không mô tả đúng phần thân lần chạy. Suốt 942 vòng đầu, chi
+phí dao động giữa 1 và 4 lần mỗi vòng với trung vị đúng bằng 3 và không vòng nào
+vượt 4; hai vòng 943 và 945 vọt lên 25 và 32 rồi rơi lại ngay, và từ vòng 946 tới
+vòng 1003 chi phí về đúng dải cũ, chỉ ba vòng lên tới 7 hoặc 9. Bức tường thật bắt
+đầu ở vòng 1004: 48 vòng cuối không vòng nào xuống dưới 25 và đỉnh là 36 lần ở
+vòng 1033 (hình~\ref{fig:huber-cost}). Ở phần đuôi đó, mức giảm thật của hàm
 mục tiêu đã nhỏ hơn nhiễu làm tròn của $f_{H}$ nên mọi bước thử đều trượt điều
 kiện giảm đủ và line search phải chia đôi hàng chục lần mới tìm được một bước lọt
 qua, đúng hiện tượng mà chương~\ref{ch:step} mô tả bằng hình~\ref{fig:armijocost}.
-Phần đuôi đó cũng là lý do lần chạy kết thúc ở trạng thái đình trệ chứ không phải
+Bức tường đó cũng là lý do lần chạy kết thúc ở trạng thái đình trệ chứ không phải
 hội tụ.
 
 \resultfig{huber-step_cost}{Số lần đánh giá hàm mục tiêu mỗi vòng lặp mà điều kiện
-  Armijo đòi, trên hướng gradient so với trên hướng Newton.}{fig:huber-cost}
+  Armijo đòi, trên hướng gradient so với trên hướng Newton. Ba đường lấy từ hai
+  nhóm thí nghiệm nên tham số $c$ không giống nhau: $c = 0{,}3$ cho gradient
+  descent, $c = 10^{-4}$ cho hai đường Newton. Phép so sánh không phụ thuộc $c$ là
+  phép so giữa hai đường Newton với nhau.}{fig:huber-cost}
 
 Với hướng Newton, backtracking không lùi bước một lần nào, đo được đúng $1{,}00$
 lần đánh giá hàm mỗi vòng ở mọi vòng của lần chạy, tức line search nhận ngay bước
@@ -1015,16 +1035,16 @@ với bước cố định chạy 2108 vòng trong $30{,}6$ giây trên Huber so
 $27{,}5$ giây trên Ridge, còn gradient tăng tốc chạy 301 vòng và $4{,}29$ giây so
 với 286 vòng và $3{,}92$ giây. Số vòng lặp của phương pháp bậc một chỉ phụ thuộc
 $\kappa$, mà $\kappa$ thật chỉ đi từ $267{,}5$ lên $271{,}2$, tức $1{,}4$ phần
-trăm. Newton là phương pháp duy nhất mất mát thật sự, vì tính bậc hai chính là thứ
-đã cho nó một vòng lặp, và khoảng cách về số vòng giữa nó với gradient descent thu
-hẹp từ 2022 lần xuống 264 lần. Hai dòng backtracking không đọc theo cách này được,
+trăm. Newton là phương pháp duy nhất thiệt hại thật sự, vì tính bậc hai chính là
+thứ đã cho nó một vòng lặp, và khoảng cách về số vòng giữa nó với gradient descent
+thu hẹp từ 2022 lần xuống 264 lần. Hai dòng backtracking không đọc theo cách này được,
 do cả hai dừng ở trạng thái đình trệ nên 1051 vòng và 561 vòng đo vị trí sàn số
 của từng bài toán chứ không đo độ khó của chúng.
 
-SGD giữ nguyên vai trò của nó và vẫn phải đọc riêng. Nó chạy 3880 vòng lô trong
-$2{,}27$ giây, nhanh nhất trên mỗi đơn vị thời gian, nhưng dừng ở sai số
-$3{,}1 \cdot 10^{-4}$ và không bao giờ tới $10^{-6}$, gần đúng mức
-$6{,}0 \cdot 10^{-4}$ mà chương~\ref{ch:sgd} đo trên Ridge. Sàn đó do phương sai
+SGD chạy 3880 vòng lô trong $2{,}27$ giây, nhanh nhất trên mỗi đơn vị thời gian,
+nhưng dừng ở sai số $3{,}1 \cdot 10^{-4}$ và không bao giờ tới $10^{-6}$, sát mức
+$4{,}9 \cdot 10^{-4}$ mà cùng cấu hình $B = 2048$ đạt trên Ridge ở cùng quy mô
+$n = \num{200000}$. Sàn đó do phương sai
 gradient lô quyết định chứ không do độ cong của hàm mục tiêu, nên đổi mất mát bình
 phương sang mất mát Huber không dịch nó đi đáng kể. Ở ngưỡng $10^{-3}$ thì SGD vẫn
 thắng cả bốn phương pháp còn lại; ở ngưỡng chặt hơn thì nó không bao giờ về đích.
@@ -1036,8 +1056,9 @@ Phần đuôi của hình~\ref{fig:huber-headline} phải đọc theo sàn số 
 mục~\ref{sec:huber-loss}. Dưới khoảng $10^{-15}$, đường gradient descent và đường
 gradient tăng tốc chuyển thành một dải răng cưa biên độ cỡ $10^{-16}$, còn đường
 dây cung có damping trong hình~\ref{fig:huber-newton} rơi thẳng xuống đáy khung ở
-vòng 52 và vòng 55. Ở cả hai chỗ đó, sai số đo được đã xuống dưới sàn của phép
-trừ, và những điểm mà công thức trả về giá trị âm thì bị kẹp lên đáy trục logarit.
+vòng 53 và vòng 54, hai vòng duy nhất của cả lần chạy mà công thức trả về giá trị
+âm. Ở cả hai chỗ đó, sai số đo được đã xuống dưới sàn của phép trừ, và một giá trị
+âm thì bị kẹp lên đáy trục logarit.
 Đường Newton dừng ở $1{,}66 \cdot 10^{-17}$ sau 8 vòng cũng vì chạm sàn đó chứ
 không vì thuật toán hết khả năng giảm tiếp. Các hình giữ nguyên phần đuôi thay vì
 cắt bớt, nên người đọc thấy đúng chỗ mà phép đo hết tác dụng.
@@ -1275,12 +1296,14 @@ tương ứng, còn hình~\ref{fig:tradeoff} đặt $\kappa$ và RMSE lên cùng
 \chapter{Kết luận}
 % ===========================================================================
 
-Báo cáo so sánh bốn thuật toán tối ưu hóa trên cùng một hàm mất mát Ridge dựng từ
-dữ liệu Lending Club, với $\kappa = 267{,}5$ và $d = 116$. Ở cấu hình tốt nhất
-của từng phương pháp, tổng hợp ở chương~\ref{ch:headline}, thứ hạng theo cả hai
-trục đo là Newton, gradient tăng tốc,
+Báo cáo so sánh bốn thuật toán tối ưu hóa trên hai hàm mục tiêu dựng từ cùng dữ
+liệu Lending Club với $d = 116$: hàm mất mát Ridge với $\kappa = 267{,}5$, và hàm
+mất mát Huber ở chương~\ref{ch:huber} với $\kappa$ đo tại $\wstar$ là $271{,}2$. Ở
+cấu hình tốt nhất của từng phương pháp, tổng hợp ở chương~\ref{ch:headline}, thứ
+hạng theo cả hai trục đo là Newton, gradient tăng tốc,
 gradient descent với backtracking, rồi gradient descent với bước cố định; SGD
 nhanh nhất trên mỗi đơn vị thời gian nhưng dừng ở sai số $6{,}0 \cdot 10^{-4}$.
+Thứ hạng đó không đổi khi chuyển sang hàm mục tiêu thứ hai.
 
 Ba điều rút ra về việc chọn tham số. Với backtracking, $\rho$ quan trọng hơn $c$
 rất nhiều, vì nó quyết định số lần thử mỗi vòng. Với SGD, bước phải đặt theo
@@ -1289,15 +1312,23 @@ $\mu$ chứ không vào số vòng lặp mỗi epoch. Với gradient tăng tốc
 tính lại theo bước mà line search thực sự chọn, như chương~\ref{ch:momentum} chỉ
 ra.
 
-Ba chỗ thực nghiệm lệch khỏi phát biểu quen thuộc của lý thuyết, và cả ba đều
-lệch vì cùng một lý do: cận lý thuyết là cận cho trường hợp xấu nhất trên một
-lớp bài toán, còn thực nghiệm chạy trên một bài toán cụ thể, một điểm khởi tạo
-cụ thể và một ngân sách hữu hạn. Bước $1{,}9/L$ nhanh gấp $2{,}3$ lần bước tối ưu
+Năm chỗ thực nghiệm lệch khỏi phát biểu quen thuộc của lý thuyết hoặc khỏi dự đoán
+ban đầu. Ba chỗ đầu lệch vì cùng một lý do: cận lý thuyết là cận cho trường hợp
+xấu nhất trên một lớp bài toán, còn thực nghiệm chạy trên một bài toán cụ thể, một
+điểm khởi tạo cụ thể và một ngân sách hữu hạn. Bước $1{,}9/L$ nhanh gấp $2{,}3$ lần bước tối ưu
 $2/(L+\mu)$, vì sai số ban đầu tại $w_{0} = 0$ dồn $80{,}5$ phần trăm vào các
 hướng trị riêng lớn. Backtracking thắng bước cố định trên cả hai trục, vì nó so
 với thương Rayleigh tại chỗ chứ không với $L$ toàn cục. Và quy tắc giảm bước của
 SGD chỉ thắng bước hằng khi tốc độ giảm đặt đúng, với hai giá trị hợp lý cho hai
 kết luận ngược nhau.
+
+Hai chỗ còn lại đến từ hàm mục tiêu Huber, và cả hai đều xoay quanh việc thông tin
+độ cong lấy ở đâu. Dùng lại Hessian hết miễn phí ngay khi hàm mục tiêu hết bậc
+hai: với bước đầy đủ, dãy lặp khóa vào một chu trình hai điểm và không hội tụ, còn
+thêm line search thì nó về đích sau 13 vòng. Ngược lại, dự đoán rằng bỏ tính bậc
+hai sẽ làm backtracking có việc chỉ đúng với hướng gradient, tốn $4{,}20$ lần đánh
+giá hàm mỗi vòng, mà không đúng với hướng Newton, nơi line search nhận ngay bước
+đầy đủ ở mọi vòng vì bản thân hướng đó đã mang độ cong.
 
 Kết luận cuối cùng về phạm vi áp dụng. Với $d = 116$ và $n$ cỡ triệu, phương pháp
 bậc hai thắng áp đảo, vì chi phí dựng Hessian là $\bigO(nd^{2})$ với $d^{2}$ nhỏ,
