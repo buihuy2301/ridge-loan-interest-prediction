@@ -61,8 +61,9 @@ class HuberObjective:
         self.delta = float(delta)
         self.n, self.d = X.shape
 
-        # Set when the reference solution is read from disk, so a rerun does not
-        # pay for the Newton solve again.
+        # Set on first access to `w_star`, so the Newton solve in
+        # `solve_reference` runs at most once per instance rather than once per
+        # call.
         self._w_star: np.ndarray | None = None
         if w_star is not None:
             self._w_star = np.asarray(w_star, dtype=np.float64)
@@ -119,3 +120,154 @@ class HuberObjective:
         hessian = active.T @ active / self.n
         hessian.flat[:: self.d + 1] += self.lam
         return hessian
+
+    def solve_hessian(self, rhs: np.ndarray) -> np.ndarray:
+        """Solve H(0) p = rhs, with the factorisation frozen at the starting point.
+
+        `NewtonStep(reuse_factorization=True)` means "reuse the Hessian", which on
+        a quadratic is exact and here is the chord method: the direction stays a
+        descent direction but the quadratic convergence is gone. Freezing at w = 0
+        rather than at whatever point happens to call first keeps the run
+        reproducible.
+        """
+        if self._frozen_factor is None:
+            self._frozen_factor = cho_factor(self.compute_hessian(np.zeros(self.d)), lower=True)
+        return cho_solve(self._frozen_factor, rhs)
+
+    # ------------------------------------------------- optimum and constants
+
+    @property
+    def w_star(self) -> np.ndarray:
+        """The minimiser, solved for rather than read off a formula."""
+        if self._w_star is None:
+            self._w_star, self.reference_grad_norm, self.reference_iters = solve_reference(self)
+        return self._w_star
+
+    @cached_property
+    def _optimal_value(self) -> float:
+        return self.value(self.w_star)
+
+    @property
+    def f_star(self) -> float:
+        # SmoothObjective declares this as a `@property`, and a protocol property
+        # is not satisfied by `cached_property` (pyright rejects it even though
+        # both are read-only from the caller's side), so the expensive part lives
+        # in `_optimal_value` and this is a thin wrapper over it, matching
+        # `RidgeObjective`. Do not collapse it back into `cached_property`.
+        return self._optimal_value
+
+    @cached_property
+    def _residual_star(self) -> np.ndarray:
+        return self._residual(self.w_star)
+
+    @cached_property
+    def _gram_eigenvalues(self) -> np.ndarray:
+        return np.linalg.eigvalsh(self.X.T @ self.X / self.n)
+
+    @property
+    def L(self) -> float:
+        """Upper bound on the Lipschitz constant of the gradient.
+
+        Every row of the Hessian carries a weight in [0, 1], so the Huber Hessian
+        never exceeds the Ridge one in the positive semidefinite order and the
+        Ridge constant bounds both. It is also the only bound an algorithm can
+        compute without knowing where its iterates will go.
+        """
+        return float(self._gram_eigenvalues[-1]) + self.lam
+
+    @property
+    def mu(self) -> float:
+        """Lower bound on the strong convexity constant.
+
+        Rows outside the quadratic zone contribute no curvature, so in the worst
+        case the regularisation term is all that is left. Returning lam rather
+        than the tighter value measured at w* keeps the constant honest: Nesterov
+        reads `mu` to build its momentum, and it cannot be handed the answer.
+        """
+        return self.lam
+
+    @property
+    def kappa(self) -> float:
+        return self.L / self.mu
+
+    @cached_property
+    def mu_at_optimum(self) -> float:
+        """The smallest Hessian eigenvalue at w*, for the report rather than the loop.
+
+        The gap between this and `mu` is how loose the guaranteed bound is on this
+        particular problem.
+        """
+        return float(np.linalg.eigvalsh(self.compute_hessian(self.w_star))[0])
+
+    # ---------------------------------------------------------- convergence
+
+    def suboptimality(self, w: np.ndarray) -> float:
+        """f(w) - f*, with the cancellation pushed down to individual rows.
+
+        Subtracting f* from f(w) at the end loses everything below about
+        1e-16 * f*, which on the sweep problem is 1e-15 and cuts off the last
+        stage of Newton's quadratic tail. Differencing the per-row losses first,
+        and writing the penalty difference as a product rather than as a
+        difference of two squares, keeps several more orders of magnitude.
+
+        The Ridge class does better still, because a quadratic has an exact
+        quadratic form for the gap. No such identity exists here, so this is the
+        floor the Huber figures are drawn against.
+        """
+        rows = self._loss(self._residual(w)) - self._loss(self._residual_star)
+        penalty = self.lam / 2 * float((w - self.w_star) @ (w + self.w_star))
+        return float(rows.sum() / self.n + penalty)
+
+    def summary(self) -> dict:
+        """Constants worth recording alongside a group of runs."""
+        return {
+            "n": self.n,
+            "d": self.d,
+            "lam": self.lam,
+            "delta": self.delta,
+            "L": self.L,
+            "mu": self.mu,
+            "kappa": self.kappa,
+            "mu_at_optimum": self.mu_at_optimum,
+            "f_star": self.f_star,
+            "w_star_norm": float(np.linalg.norm(self.w_star)),
+            "outside_fraction": float(np.mean(np.abs(self._residual_star) > self.delta)),
+            "reference_grad_norm": self.reference_grad_norm,
+            "reference_iters": self.reference_iters,
+        }
+
+
+def solve_reference(
+    objective: HuberObjective,
+    tol: float = 1e-14,
+    max_iter: int = 100,
+) -> tuple[np.ndarray, float, int]:
+    """Newton with backtracking, run to machine precision, for w* and f*.
+
+    Every convergence curve is measured against this point, so it has to be far
+    more accurate than the runs it judges. Newton earns its place here rather than
+    in a library call: it reaches 1e-16 in single digits of iterations on this
+    problem, and the code is the same three lines the report is about.
+
+    Returns the minimiser, the gradient norm reached, and the iterations spent.
+    """
+    w = np.zeros(objective.d)
+    for k in range(max_iter):
+        value, gradient = objective.value_and_gradient(w)
+        grad_norm = float(np.linalg.norm(gradient))
+        if grad_norm <= tol:
+            return w, grad_norm, k
+
+        direction = np.linalg.solve(objective.compute_hessian(w), -gradient)
+        slope = float(gradient @ direction)
+        step = 1.0
+        while objective.value(w + step * direction) > value + 1e-4 * step * slope:
+            step *= 0.5
+            if step < 1e-12:
+                raise RuntimeError(f"line search collapsed at iteration {k}")
+        w = w + step * direction
+
+    raise RuntimeError(
+        f"reference solve did not reach {tol:g} in {max_iter} iterations; "
+        f"last gradient norm was {grad_norm:.3e}"
+    )

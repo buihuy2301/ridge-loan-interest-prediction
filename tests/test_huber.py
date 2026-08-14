@@ -83,3 +83,64 @@ def test_value_and_gradient_agree_with_the_separate_calls(objective, probe):
     value, gradient = objective.value_and_gradient(probe)
     assert value == pytest.approx(objective.value(probe), rel=1e-14)
     assert np.allclose(gradient, objective.gradient(probe), rtol=1e-14)
+
+
+def test_the_reference_solution_has_a_vanishing_gradient(objective):
+    assert np.linalg.norm(objective.gradient(objective.w_star)) <= 1e-13
+
+
+def test_the_constants_are_the_bounds_the_algorithm_may_assume(objective, data):
+    X, y = data
+    ridge = RidgeObjective(X, y, lam=LAM)
+    # The Huber Hessian never exceeds the Ridge one, so they share an upper bound.
+    assert objective.L == pytest.approx(ridge.L, rel=1e-12)
+    # Rows outside the quadratic zone contribute nothing, so only lam is certain.
+    assert objective.mu == pytest.approx(LAM)
+    assert objective.kappa == pytest.approx(objective.L / LAM)
+    # Measured at the optimum the constant is tighter than the bound.
+    assert objective.mu_at_optimum >= objective.mu
+
+
+def test_suboptimality_is_never_negative(objective):
+    rng = np.random.default_rng(11)
+    for _ in range(20):
+        w = objective.w_star + 0.1 * rng.standard_normal(objective.d)
+        assert objective.suboptimality(w) >= 0.0
+
+
+def test_suboptimality_agrees_with_the_plain_difference_far_from_the_optimum(objective, probe):
+    plain = objective.value(probe) - objective.f_star
+    assert objective.suboptimality(probe) == pytest.approx(plain, rel=1e-9)
+
+
+def test_suboptimality_resolves_below_the_plain_difference(objective):
+    """Close to w* the plain difference is rounding noise and the paired one is not.
+
+    The gap of a smooth function near its minimiser is the quadratic form of the
+    Hessian, and that is what the paired formula has to reproduce at a distance
+    where subtracting two floats cannot.
+    """
+    step = 1e-9 * np.ones(objective.d)
+    w = objective.w_star + step
+    quadratic = 0.5 * float(step @ (objective.compute_hessian(objective.w_star) @ step))
+
+    assert objective.suboptimality(w) == pytest.approx(quadratic, rel=1e-3)
+    plain = objective.value(w) - objective.f_star
+    assert abs(plain - quadratic) > 0.5 * quadratic
+
+
+def test_solve_hessian_freezes_the_factor_at_the_origin(objective):
+    """`reuse_factorization=True` is the chord method here, not Newton."""
+    rhs = np.ones(objective.d)
+    expected = np.linalg.solve(objective.compute_hessian(np.zeros(objective.d)), rhs)
+    assert np.allclose(objective.solve_hessian(rhs), expected, rtol=1e-10)
+    # A second call must reuse the same factor rather than refactor at a new point.
+    assert np.allclose(objective.solve_hessian(rhs), expected, rtol=1e-10)
+
+
+def test_summary_records_what_the_report_needs(objective):
+    summary = objective.summary()
+    for key in ("n", "d", "lam", "delta", "L", "mu", "kappa",
+                "mu_at_optimum", "f_star", "outside_fraction"):
+        assert key in summary
+    assert 0.0 <= summary["outside_fraction"] <= 1.0
