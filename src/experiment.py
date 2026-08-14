@@ -22,12 +22,12 @@ import numpy as np
 
 from .direction import Direction, MiniBatch, Nesterov, NewtonStep, SteepestDescent
 from .iterate import iterate, warm_up
-from .objective import RidgeObjective, batch_smoothness
+from .objective import RidgeObjective, SmoothObjective, batch_smoothness
 from .record import RunRecord, load_records, save_records
 from .stepsize import Armijo, Decay, Fixed, StepRule
 
-MakeDirection = Callable[[RidgeObjective], Direction]
-MakeStep = Callable[[RidgeObjective], StepRule]
+MakeDirection = Callable[[SmoothObjective], Direction]
+MakeStep = Callable[[SmoothObjective], StepRule]
 
 RESULTS_DIR = Path("results/raw")
 
@@ -57,7 +57,7 @@ class ExperimentGroup:
     name: str
     """Doubles as the JSON filename and the figure filename stem."""
     title: str
-    build: Callable[[RidgeObjective], list[RunSpec]]
+    build: Callable[[SmoothObjective], list[RunSpec]]
 
 
 def product(
@@ -87,7 +87,7 @@ def product(
 # ----------------------------------------------------------------- execution
 
 
-def run_spec(objective: RidgeObjective, spec: RunSpec, warmup: bool = False) -> RunRecord:
+def run_spec(objective: SmoothObjective, spec: RunSpec, warmup: bool = False) -> RunRecord:
     """Run one cell, repeated if asked, keeping the median-time repetition.
 
     Repetitions exist for the clock alone. A deterministic pair produces the same
@@ -118,7 +118,7 @@ def run_spec(objective: RidgeObjective, spec: RunSpec, warmup: bool = False) -> 
 
 def run_group(
     group: ExperimentGroup,
-    objective: RidgeObjective,
+    objective: SmoothObjective,
     out_dir: str | Path = RESULTS_DIR,
     force: bool = False,
     verbose: bool = True,
@@ -154,7 +154,7 @@ def run_group(
 
 def run_all(
     groups: Iterable[ExperimentGroup],
-    objective: RidgeObjective,
+    objective: SmoothObjective,
     out_dir: str | Path = RESULTS_DIR,
     force: bool = False,
 ) -> dict[str, list[RunRecord]]:
@@ -164,7 +164,7 @@ def run_all(
 # ------------------------------------------------------------------ the grids
 
 
-def group_step_fixed(objective: RidgeObjective) -> list[RunSpec]:
+def group_step_fixed(objective: SmoothObjective) -> list[RunSpec]:
     """Constant steps expressed through L, including one that diverges."""
     L, mu = objective.L, objective.mu
     choices = {
@@ -191,7 +191,7 @@ def group_step_fixed(objective: RidgeObjective) -> list[RunSpec]:
     ]
 
 
-def group_step_blind(objective: RidgeObjective) -> list[RunSpec]:
+def group_step_blind(objective: SmoothObjective) -> list[RunSpec]:
     """The step sizes the brief suggests trying by hand, without computing L.
 
     Kept as its own group so chapter 4 can put the hand-picked values next to
@@ -209,7 +209,7 @@ def group_step_blind(objective: RidgeObjective) -> list[RunSpec]:
     ]
 
 
-def group_step_armijo(objective: RidgeObjective) -> list[RunSpec]:
+def group_step_armijo(objective: SmoothObjective) -> list[RunSpec]:
     """The Armijo grid of section 5.2, plus the probe count each setting costs."""
     L = objective.L
     specs = []
@@ -228,7 +228,7 @@ def group_step_armijo(objective: RidgeObjective) -> list[RunSpec]:
     return specs
 
 
-def group_momentum_formula(objective: RidgeObjective) -> list[RunSpec]:
+def group_momentum_formula(objective: SmoothObjective) -> list[RunSpec]:
     """Three momentum rules against plain gradient descent at the same step."""
     step = 1.0 / objective.L
     directions: dict[str, MakeDirection] = {
@@ -249,7 +249,7 @@ def group_momentum_formula(objective: RidgeObjective) -> list[RunSpec]:
     ]
 
 
-def group_momentum_restart(objective: RidgeObjective) -> list[RunSpec]:
+def group_momentum_restart(objective: SmoothObjective) -> list[RunSpec]:
     """Adaptive restart on and off, for each momentum rule."""
     step = 1.0 / objective.L
     specs = []
@@ -266,7 +266,7 @@ def group_momentum_restart(objective: RidgeObjective) -> list[RunSpec]:
     return specs
 
 
-def group_batch_size(objective: RidgeObjective) -> list[RunSpec]:
+def group_batch_size(objective: SmoothObjective) -> list[RunSpec]:
     """Batch sizes, each with the step its own smoothness constant allows.
 
     A single step shared across batch sizes is a separate comparison, included
@@ -299,7 +299,7 @@ def group_batch_size(objective: RidgeObjective) -> list[RunSpec]:
     return specs
 
 
-def group_batch_eta(objective: RidgeObjective, batch: int = 256) -> list[RunSpec]:
+def group_batch_eta(objective: SmoothObjective, batch: int = 256) -> list[RunSpec]:
     """A logarithmic grid of initial step sizes at one batch size.
 
     Section 5.2 asks for this sweep, and it is the evidence for whether the
@@ -331,7 +331,7 @@ def group_batch_eta(objective: RidgeObjective, batch: int = 256) -> list[RunSpec
     return specs
 
 
-def group_batch_schedule(objective: RidgeObjective, batch: int = 256, seeds=(0, 1, 2, 3, 4)) -> list[RunSpec]:
+def group_batch_schedule(objective: SmoothObjective, batch: int = 256, seeds=(0, 1, 2, 3, 4)) -> list[RunSpec]:
     """The four deterministic schedules of section 4.3, over five seeds.
 
     Five seeds because the curves are random: the report shows the median with a
@@ -372,7 +372,7 @@ def group_batch_schedule(objective: RidgeObjective, batch: int = 256, seeds=(0, 
     ]
 
 
-def group_newton_damping(objective: RidgeObjective) -> list[RunSpec]:
+def group_newton_damping(objective: SmoothObjective) -> list[RunSpec]:
     """Full step against damped, and refactoring against reusing the Hessian."""
     directions: dict[str, MakeDirection] = {
         "Newton": lambda o: NewtonStep(o),
@@ -385,7 +385,7 @@ def group_newton_damping(objective: RidgeObjective) -> list[RunSpec]:
     return product(directions, steps, max_iter=50, repeats=3)
 
 
-def group_headline(objective: RidgeObjective) -> list[RunSpec]:
+def group_headline(objective: SmoothObjective) -> list[RunSpec]:
     """The best configuration of each method, timed carefully.
 
     The winners come from the sweep groups above, read off by `best_of` on time
@@ -421,7 +421,71 @@ def group_headline(objective: RidgeObjective) -> list[RunSpec]:
     ]
 
 
-BUILDERS: dict[str, tuple[str, Callable[[RidgeObjective], list[RunSpec]]]] = {
+# ------------------------------------------- the second problem, section 4.4
+
+
+def group_huber_newton(objective: SmoothObjective) -> list[RunSpec]:
+    """Newton on a function that is not a quadratic.
+
+    On Ridge this group compares a full step against a damped one and pays for
+    refactoring against reusing. Here the same four cells answer a sharper
+    question: how many iterations Newton needs once it no longer lands on w* in
+    one, and what reusing the Hessian costs when the Hessian actually moves.
+    """
+    directions: dict[str, MakeDirection] = {
+        "Newton": lambda o: NewtonStep(o),
+        "Newton (Hessian reused)": lambda o: NewtonStep(o, reuse_factorization=True),
+    }
+    steps: dict[str, MakeStep] = {
+        "t = 1": lambda _: Fixed(1.0, label="t = 1"),
+        "Armijo": lambda _: Armijo(c=1e-4, rho=0.5, t0=1.0),
+    }
+    return product(directions, steps, max_iter=60, repeats=3)
+
+
+def group_huber_headline(objective: SmoothObjective) -> list[RunSpec]:
+    """The configurations chosen on Ridge, rerun against the Huber objective.
+
+    The grids are deliberately not swept again. The question here is what the
+    shape of the objective does to the ranking, and re-tuning every method would
+    put two changes into one figure.
+
+    One configuration differs from the Ridge headline and has to: there the best
+    Newton reused its factorisation, which is exact on a quadratic. Reusing it
+    here is the chord method, a different algorithm, so the headline uses plain
+    Newton and the chord variant stays in `huber-newton` where it is the subject
+    rather than a stand-in.
+    """
+    return [
+        RunSpec(SteepestDescent, lambda o: Fixed(1.9 / o.L, label="t = 1.9/L"),
+                label="GD (t = 1.9/L)", max_iter=3000, repeats=3,
+                params={"method": "GD, fixed step"}),
+        RunSpec(SteepestDescent, lambda o: Armijo(c=0.3, rho=0.5, t0=1.0),
+                label="GD (Armijo c=0.3, rho=0.5, t0=1)", max_iter=1500, repeats=3,
+                params={"method": "GD, backtracking"}),
+        RunSpec(lambda o: Nesterov(o, "strongly_convex", restart=True),
+                lambda o: Fixed(1.0 / o.L, label="t = 1/L"),
+                label="AGD (beta from t, mu, restart)", max_iter=1000, repeats=3,
+                params={"method": "AGD"}),
+        RunSpec(lambda o: MiniBatch(o, 2048, seed=0),
+                lambda o: Decay("constant", 1.0 / batch_smoothness(o, 2048)),
+                label="SGD (B = 2048, eta = 1/L_B)", max_epochs=40, repeats=3,
+                params={"method": "SGD"}),
+        RunSpec(lambda o: NewtonStep(o), lambda o: Fixed(1.0, label="t = 1"),
+                label="Newton (t = 1)", max_iter=15, repeats=3,
+                params={"method": "Newton"}),
+    ]
+
+
+HUBER_BUILDERS: dict[str, tuple[str, Callable[[SmoothObjective], list[RunSpec]]]] = {
+    "huber-newton": ("Newton on the Huber objective", group_huber_newton),
+    "huber-headline": ("Best configuration of each method, Huber objective", group_huber_headline),
+}
+
+HUBER_GROUPS = [ExperimentGroup(name, title, build) for name, (title, build) in HUBER_BUILDERS.items()]
+
+
+BUILDERS: dict[str, tuple[str, Callable[[SmoothObjective], list[RunSpec]]]] = {
     "step-fixed": ("Constant step sizes for gradient descent", group_step_fixed),
     "step-blind": ("Step sizes picked without computing L", group_step_blind),
     "step-armijo": ("Backtracking configurations", group_step_armijo),
@@ -466,7 +530,7 @@ def headline_group(chosen: dict[str, RunSpec]) -> ExperimentGroup:
     Timing is what this group is for, so every configuration is repeated three
     times and the median kept.
     """
-    def build(objective: RidgeObjective) -> list[RunSpec]:
+    def build(objective: SmoothObjective) -> list[RunSpec]:
         specs = []
         for name, spec in chosen.items():
             spec.repeats = max(spec.repeats, 3)
@@ -633,6 +697,7 @@ def main() -> None:
 
     parser = argparse.ArgumentParser(description="Run the experiment grids.")
     parser.add_argument("--scale", choices=("sweep", "full"), default="sweep")
+    parser.add_argument("--problem", choices=("ridge", "huber"), default="ridge")
     parser.add_argument("--out", default=str(RESULTS_DIR))
     parser.add_argument("--only", nargs="*", help="group names; default is all of them")
     parser.add_argument("--force", action="store_true", help="rerun groups already on disk")
@@ -640,20 +705,39 @@ def main() -> None:
 
     scale = SWEEP if args.scale == "sweep" else FULL
     objective, X_test, y_test, _ = load_processed(scale=scale)
-    print(
-        f"scale={args.scale}  n={objective.n:,}  d={objective.d}  "
-        f"lam={objective.lam:.5g}  L={objective.L:.4f}  mu={objective.mu:.6f}  "
-        f"kappa={objective.kappa:.1f}\n"
-    )
 
-    groups = [g for g in GROUPS if not args.only or g.name in args.only]
+    if args.problem == "huber":
+        from .huber import build_huber
+
+        objective = build_huber(objective.X, objective.y, objective.lam)
+        available = HUBER_GROUPS
+        print(
+            f"problem=huber  scale={args.scale}  n={objective.n:,}  d={objective.d}  "
+            f"lam={objective.lam:.5g}  delta={objective.delta:.4f}  L={objective.L:.4f}  "
+            f"mu={objective.mu:.6f}  kappa={objective.kappa:.1f}\n"
+        )
+    else:
+        available = GROUPS
+        print(
+            f"scale={args.scale}  n={objective.n:,}  d={objective.d}  "
+            f"lam={objective.lam:.5g}  L={objective.L:.4f}  mu={objective.mu:.6f}  "
+            f"kappa={objective.kappa:.1f}\n"
+        )
+
+    groups = [g for g in available if not args.only or g.name in args.only]
     started = time.perf_counter()
     for group in groups:
         run_group(group, objective, args.out, force=args.force)
         print()
 
-    if not args.only or "library" in args.only:
+    if args.problem == "ridge" and (not args.only or "library" in args.only):
         from .reference import run_baselines, save_baselines
+
+        # `objective` is a RidgeObjective here: it is only ever reassigned to a
+        # HuberObjective in the branch above, guarded by the same `args.problem`
+        # check. Pyright cannot correlate two separate `if` conditions on the
+        # same runtime value, so the invariant is spelled out for the checker.
+        assert isinstance(objective, RidgeObjective)
 
         path = Path(args.out) / "library.json"
         if path.exists() and not args.force:

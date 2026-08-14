@@ -237,3 +237,27 @@ def test_headline_group_forces_repetitions_because_it_reports_time(objective):
     specs = headline_group(chosen).build(objective)
     assert specs[0].repeats >= 3
     assert headline_group(chosen).name == "headline"
+
+
+def test_the_huber_groups_expand_to_the_configurations_the_chapter_needs():
+    from src.experiment import HUBER_BUILDERS, HUBER_GROUPS, group_huber_headline, group_huber_newton
+    from src.huber import HuberObjective
+
+    rng = np.random.default_rng(0)
+    X = rng.standard_normal((200, 8))
+    y = X @ rng.standard_normal(8) + 0.2 * rng.standard_normal(200)
+    objective = HuberObjective(X, y - y.mean(), lam=1e-2, delta=0.5)
+
+    # Two directions crossed with two step rules, as in the Ridge Newton group.
+    assert len(group_huber_newton(objective)) == 4
+    # One configuration for each of the four methods, plus the chord variant.
+    assert len(group_huber_headline(objective)) == 5
+
+    assert set(HUBER_BUILDERS) == {"huber-newton", "huber-headline"}
+    assert all(group.name.startswith("huber-") for group in HUBER_GROUPS)
+
+
+def test_the_huber_groups_do_not_collide_with_the_ridge_ones():
+    from src.experiment import BUILDERS, HUBER_BUILDERS
+
+    assert not set(BUILDERS) & set(HUBER_BUILDERS)
