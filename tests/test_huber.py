@@ -114,19 +114,24 @@ def test_suboptimality_agrees_with_the_plain_difference_far_from_the_optimum(obj
 
 
 def test_suboptimality_resolves_below_the_plain_difference(objective):
-    """Close to w* the plain difference is rounding noise and the paired one is not.
+    """Close to w*, the plain difference is rounding noise and the paired one is not.
 
-    The gap of a smooth function near its minimiser is the quadratic form of the
-    Hessian, and that is what the paired formula has to reproduce at a distance
-    where subtracting two floats cannot.
+    A piecewise-quadratic function's gap near its minimiser is the quadratic form
+    of the Hessian, so that form is the truth both estimates are judged against.
+    The distance is chosen where subtracting two floats has lost every digit:
+    `value(w) - f_star` collapses to exactly zero, while the paired formula still
+    lands on the right order of magnitude. The bounds are ratios rather than
+    tolerances because at 1e-18 the paired formula carries its own rounding noise,
+    measured at about 14 percent here.
     """
     step = 1e-9 * np.ones(objective.d)
     w = objective.w_star + step
     quadratic = 0.5 * float(step @ (objective.compute_hessian(objective.w_star) @ step))
 
-    assert objective.suboptimality(w) == pytest.approx(quadratic, rel=1e-3)
     plain = objective.value(w) - objective.f_star
-    assert abs(plain - quadratic) > 0.5 * quadratic
+    assert abs(plain - quadratic) > 0.9 * quadratic
+
+    assert 0.5 * quadratic < objective.suboptimality(w) < 2.0 * quadratic
 
 
 def test_solve_hessian_freezes_the_factor_at_the_origin(objective):

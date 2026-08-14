@@ -205,10 +205,12 @@ class HuberObjective:
         """f(w) - f*, with the cancellation pushed down to individual rows.
 
         Subtracting f* from f(w) at the end loses everything below about
-        1e-16 * f*, which on the sweep problem is 1e-15 and cuts off the last
-        stage of Newton's quadratic tail. Differencing the per-row losses first,
-        and writing the penalty difference as a product rather than as a
-        difference of two squares, keeps several more orders of magnitude.
+        1e-16 * f*, which cuts off the last stage of Newton's quadratic tail.
+        Differencing the per-row losses first, and writing the penalty difference
+        as a product rather than as a difference of two squares, keeps the
+        cancellation local to each term instead of letting it happen once at the
+        end; the actual gain over the plain difference is measured, not assumed,
+        and Task 6 reports the figure on the real fixture.
 
         The Ridge class does better still, because a quadratic has an exact
         quadratic form for the gap. No such identity exists here, so this is the
